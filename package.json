@@ -1,0 +1,23 @@
+{
+  "name": "playwright-huzeif",
+  "version": "1.0.0",
+  "description": "Playwright tests with Docker and CI/CD",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "docker:build": "docker compose build",
+    "docker:test": "docker compose run --rm playwright"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.4"
+  }
+}

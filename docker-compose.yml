@@ -1,0 +1,13 @@
+services:
+  playwright:
+    build: .
+    image: playwright-huzeif:latest
+    environment:
+      - CI=true
+      - BASE_URL=${BASE_URL:-https://ftx.dev.ftxcommerce.com}
+    # Reports host machine par aa jayengi
+    volumes:
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+    ipc: host          # Chromium crash se bachne ke liye
+    init: true
