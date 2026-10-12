@@ -20,7 +20,7 @@ jobs:
   # Job 1: Normal run (Docker ke bina)
   test:
     name: Tests (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -54,7 +54,7 @@ jobs:
   # Job 2: Docker image build + usi mein tests
   docker:
     name: Docker build & test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
