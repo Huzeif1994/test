@@ -148,11 +148,12 @@ jobs:
 
       - name: Run tests in container
         run: |
-          mkdir -p playwright-report test-results
+          mkdir -p playwright-report test-results allure-results
           docker run --rm --ipc=host \
             -e BASE_URL=${{ env.BASE_URL }} \
             -v "$PWD/playwright-report:/app/playwright-report" \
             -v "$PWD/test-results:/app/test-results" \
+            -v "$PWD/allure-results:/app/allure-results" \
             playwright-huzeif:ci
 
       - uses: actions/upload-artifact@v4
@@ -163,3 +164,12 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
+
+      # Docker run ke Allure results (alag naam, taaki main combined report mein na mile)
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: docker-allure-results
+          path: allure-results/
+          retention-days: 14
+          if-no-files-found: warn

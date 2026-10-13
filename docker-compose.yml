@@ -9,5 +9,6 @@ services:
     volumes:
       - ./playwright-report:/app/playwright-report
       - ./test-results:/app/test-results
+      - ./allure-results:/app/allure-results
     ipc: host          # Chromium crash se bachne ke liye
     init: true
