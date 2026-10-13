@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Job 1: Normal run (Docker ke bina)
+  # Job 1: Normal run (Docker ke bina), 3 browsers parallel
   test:
     name: Tests (${{ matrix.project }})
     runs-on: ubuntu-24.04
@@ -52,7 +52,82 @@ jobs:
             test-results/
           retention-days: 14
 
-  # Job 2: Docker image build + usi mein tests
+      # Allure ke raw results (agle job mein teeno browsers ke results jodenge)
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: allure-results-${{ matrix.project }}
+          path: allure-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Job 2: Teeno browsers ke Allure results jodke ek report banao
+  allure-report:
+    name: Allure report
+    needs: test
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download all Allure results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          merge-multiple: true
+          path: allure-results
+
+      # Pichhle runs ki history (trends ke liye). Pehli baar na mile to koi dikkat nahi.
+      - name: Restore Allure history
+        uses: actions/cache@v4
+        with:
+          path: allure-history.jsonl
+          key: allure-history-${{ github.run_id }}
+          restore-keys: |
+            allure-history-
+
+      - name: Generate Allure report
+        run: npx allure generate allure-results -o allure-report
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 14
+
+      # GitHub Pages par publish (PR par nahi, sirf main/schedule/manual)
+      - name: Upload Pages artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report/
+
+  # Job 3: GitHub Pages deploy (link: https://<username>.github.io/<repo>/)
+  deploy-report:
+    name: Publish report to GitHub Pages
+    needs: allure-report
+    if: ${{ !cancelled() && needs.allure-report.result == 'success' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Job 4: Docker image build + usi mein tests
   docker:
     name: Docker build & test
     runs-on: ubuntu-24.04
