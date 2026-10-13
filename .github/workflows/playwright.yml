@@ -7,7 +7,8 @@ on:
     branches: [main, master]
   workflow_dispatch:        # manual run ke liye
   schedule:
-    - cron: '30 3 * * *'    # roz 9:00 AM IST
+    - cron: '15 12 * * *'   # roz dopahar 12:15 PM IST
+      timezone: 'Asia/Kolkata'
 
 env:
   BASE_URL: https://ftx.dev.ftxcommerce.com
