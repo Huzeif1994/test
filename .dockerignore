@@ -9,3 +9,6 @@ playwright/.auth
 .env
 Dockerfile
 docker-compose.yml
+allure-results
+allure-report
+allure-history.jsonl

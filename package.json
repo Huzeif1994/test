@@ -10,7 +10,11 @@
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
     "docker:build": "docker compose build",
-    "docker:test": "docker compose run --rm playwright"
+    "docker:test": "docker compose run --rm playwright",
+    "allure:generate": "allure generate allure-results -o allure-report",
+    "allure:open": "allure open allure-report",
+    "allure:serve": "allure serve allure-results",
+    "allure:clean": "node -e \"require('fs').rmSync('allure-results',{recursive:true,force:true});require('fs').rmSync('allure-report',{recursive:true,force:true})\""
   },
   "keywords": [],
   "author": "",
@@ -18,6 +22,8 @@
   "type": "commonjs",
   "devDependencies": {
     "@playwright/test": "^1.64.0",
-    "@types/node": "^26.6.4"
+    "@types/node": "^26.6.4",
+    "allure": "^3.20.1",
+    "allure-playwright": "^3.13.0"
   }
 }
