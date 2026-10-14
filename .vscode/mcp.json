@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "playwright-test": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/node_modules/@playwright/test/cli.js",
+        "run-test-mcp-server"
+      ]
+    }
+  },
+  "inputs": []
+}

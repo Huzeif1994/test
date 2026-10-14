@@ -5,14 +5,12 @@ export class HomePage extends BasePage {
   protected readonly path = '/';
 
   // ---- Locators (sirf yahin define honge) ----
-  // Abhi koi nahi. Asli store ka URL milne par header, search, login link yahan aayenge.
-
-  constructor(page: Page) {
-    super(page);
-  }
+  // Asli store ke locators header, search, login link yahan aayenge.
 
   // ---- Actions / Assertions ----
   async expectOnHomePage(): Promise<void> {
-    await expect(this.page).toHaveURL(/ftx\.dev\.ftxcommerce\.com/);
+    const baseUrl = process.env.BASE_URL || 'https://ftx.dev.ftxcommerce.com';
+    const hostname = new URL(baseUrl).hostname.replace(/\./g, '\\.');
+    await expect(this.page).toHaveURL(new RegExp(hostname));
   }
 }

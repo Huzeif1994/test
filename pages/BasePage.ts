@@ -10,8 +10,11 @@ export abstract class BasePage {
   /** Page ka path (baseURL ke baad). Child class override karegi. */
   protected abstract readonly path: string;
 
-  async goto(): Promise<void> {
-    await this.page.goto(this.path);
+  async goto(waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'load'): Promise<void> {
+    const response = await this.page.goto(this.path, { waitUntil });
+    if (response && response.status() >= 400) {
+      throw new Error(`Failed to navigate to ${this.path}: HTTP status ${response.status()}`);
+    }
   }
 
   async title(): Promise<string> {

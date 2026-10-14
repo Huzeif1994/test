@@ -2,12 +2,12 @@
   "name": "playwright-huzeif",
   "version": "1.0.0",
   "description": "Playwright tests with Docker and CI/CD",
-  "main": "index.js",
   "scripts": {
     "test": "playwright test",
     "test:chromium": "playwright test --project=chromium",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
+    "typecheck": "tsc --noEmit",
     "report": "playwright show-report",
     "docker:build": "docker compose build",
     "docker:test": "docker compose run --rm playwright",
@@ -15,16 +15,17 @@
     "allure:open": "allure open allure-report",
     "allure:serve": "allure serve allure-results",
     "allure:clean": "node -e \"require('fs').rmSync('allure-results',{recursive:true,force:true});require('fs').rmSync('allure-report',{recursive:true,force:true})\"",
-    "docker:allure": "npm run docker:test && npm run allure:generate && npm run allure:open"
+    "docker:allure": "node -e \"const { spawnSync } = require('child_process'); spawnSync('npm', ['run', 'docker:test'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:generate'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:open'], { stdio: 'inherit', shell: true });\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@playwright/test": "^1.64.0",
+    "@playwright/test": "1.64.0",
     "@types/node": "^26.6.4",
     "allure": "^3.20.1",
-    "allure-playwright": "^3.13.0"
+    "allure-playwright": "^3.13.0",
+    "typescript": "^5.9.3"
   }
 }

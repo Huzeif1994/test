@@ -7,15 +7,14 @@ on:
     branches: [main, master]
   workflow_dispatch:        # manual run ke liye
   schedule:
-    - cron: '15 12 * * *'   # roz dopahar 12:15 PM IST
-      timezone: 'Asia/Kolkata'
+    - cron: '45 6 * * *'   # roz dopahar 12:15 PM IST (06:45 UTC)
 
 env:
   BASE_URL: https://ftx.dev.ftxcommerce.com
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Job 1: Normal run (Docker ke bina), 3 browsers parallel
@@ -154,7 +153,7 @@ jobs:
             -v "$PWD/playwright-report:/app/playwright-report" \
             -v "$PWD/test-results:/app/test-results" \
             -v "$PWD/allure-results:/app/allure-results" \
-            playwright-huzeif:ci
+            playwright-huzeif:ci npx playwright test --project=chromium
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
