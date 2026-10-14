@@ -2,12 +2,12 @@ import { allure } from 'allure-playwright';
 import { test } from '../../fixtures/pages';
 
 test.describe('Online Ordering App', () => {
-  test('home page opens successfully and handles popups', async ({ orderingHomePage }) => {
+  test('user visits storefront, handles popups, and logs in via Identity Server', async ({ orderingHomePage }) => {
     await allure.epic('Online Ordering');
-    await allure.feature('Storefront Landing');
-    await allure.severity('critical');
+    await allure.feature('Authentication & Storefront Landing');
+    await allure.severity('blocker');
 
-    await test.step('Navigate to Ordering home page', async () => {
+    await test.step('Navigate to Ordering storefront home page', async () => {
       await orderingHomePage.goto();
     });
 
@@ -19,27 +19,12 @@ test.describe('Online Ordering App', () => {
       await orderingHomePage.handleAgeVerification();
     });
 
-    await test.step('Verify Ordering URL', async () => {
+    await test.step('Verify initial Storefront landing URL', async () => {
       await orderingHomePage.expectOnHomePage();
     });
-  });
 
-  test('user logs in via Identity Server and redirects back', async ({ orderingHomePage }) => {
-    await allure.epic('Online Ordering');
-    await allure.feature('Authentication');
-    await allure.severity('blocker');
-
-    await test.step('Open storefront and clear dialogs', async () => {
-      await orderingHomePage.goto();
-      await orderingHomePage.handleDisclaimer();
-      await orderingHomePage.handleAgeVerification();
-    });
-
-    await test.step('Perform Login via Identity Server', async () => {
+    await test.step('Execute Login via Identity Server and verify redirection', async () => {
       await orderingHomePage.login();
-    });
-
-    await test.step('Verify redirection back to storefront', async () => {
       await orderingHomePage.expectLoggedIn();
     });
   });
