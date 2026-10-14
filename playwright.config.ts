@@ -7,26 +7,21 @@ export default defineConfig({
   /* Dev site slow hai (page kholne mein 25-30s), isliye test timeout badhaya */
   timeout: 60_000,
 
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* Run tests sequentially to avoid choking slow dev server */
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Use single worker to ensure stability against dev server */
+  workers: 1,
 
-  reporter: process.env.CI
-    ? [
-        ['list'],
-        ['html', { open: 'never' }],
-        ['junit', { outputFile: 'test-results/junit.xml' }],
-        ['allure-playwright', { resultsDir: 'allure-results' }],
-      ]
-    : [
-        ['html'],
-        ['allure-playwright', { resultsDir: 'allure-results' }],
-      ],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }],
+    ...(process.env.CI ? [['junit', { outputFile: 'test-results/junit.xml' }] as const] : []),
+    ['allure-playwright', { resultsDir: 'allure-results' }],
+  ],
 
   use: {
     navigationTimeout: 45_000,

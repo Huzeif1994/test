@@ -25,14 +25,12 @@ export class FulfillmentLoginPage extends BasePage {
   async login(user: string = config.fulfillment.user, password?: string): Promise<void> {
     const pass = password || config.fulfillment.password || '';
 
-    // Click Login on landing page
-    if (await this.landingLoginButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await Promise.all([
-        this.page.waitForURL(/dev-identity/i, { timeout: 30000 }),
-        this.landingLoginButton.click(),
-      ]);
-    }
-    await this.page.waitForTimeout(2000);
+    // Wait for landing login button and click
+    await this.landingLoginButton.waitFor({ state: 'visible', timeout: 30000 });
+    await Promise.all([
+      this.page.waitForURL(/dev-identity/i, { timeout: 30000 }),
+      this.landingLoginButton.click(),
+    ]);
 
     // Switch to Email if required
     if (await this.useEmailLink.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -40,14 +38,15 @@ export class FulfillmentLoginPage extends BasePage {
       await this.page.waitForTimeout(1000);
     }
 
-    // Fill credentials
+    // Wait for email input on Identity server
+    await this.emailInput.waitFor({ state: 'visible', timeout: 30000 });
     await this.emailInput.fill(user);
     await this.passwordInput.fill(pass);
 
     // Submit and wait for redirect back
     const targetHost = new URL(config.fulfillment.baseUrl).hostname.replace(/\./g, '\\.');
     await Promise.all([
-      this.page.waitForURL(new RegExp(targetHost), { timeout: 45000 }).catch(() => {}),
+      this.page.waitForURL(new RegExp(targetHost), { timeout: 45000 }),
       this.submitSignInButton.click(),
     ]);
 

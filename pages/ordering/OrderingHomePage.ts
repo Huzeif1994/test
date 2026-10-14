@@ -36,23 +36,31 @@ export class OrderingHomePage extends BasePage {
   /**
    * Handle Disclaimer Modal if present on dev/staging storefront
    */
-  async handleDisclaimer(): Promise<void> {
-    if (await this.disclaimerButton.isVisible({ timeout: 7000 }).catch(() => false)) {
+  async handleDisclaimer(timeout: number = 20000): Promise<void> {
+    try {
+      await this.disclaimerButton.waitFor({ state: 'visible', timeout });
       await this.disclaimerButton.click();
-      await this.page.waitForTimeout(1500);
+      await this.disclaimerButton.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+      await this.page.waitForTimeout(1000);
+    } catch {
+      // Disclaimer didn't appear within timeout (may not be enabled)
     }
   }
 
   /**
    * Handle Age Verification Modal (21+) if enabled on store
    */
-  async handleAgeVerification(): Promise<void> {
-    if (await this.ageVerificationButton.isVisible({ timeout: 4000 }).catch(() => false)) {
+  async handleAgeVerification(timeout: number = 8000): Promise<void> {
+    try {
+      await this.ageVerificationButton.waitFor({ state: 'visible', timeout });
       await this.ageVerificationButton.click();
-      await this.page.waitForTimeout(1500);
+      await this.ageVerificationButton.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+      await this.page.waitForTimeout(1000);
+    } catch {
+      // Age verification didn't appear (may not be enabled)
     }
-    // Wait for backdrop overlay to disappear
-    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    // Wait for Quasar dialog backdrop overlay to detach
+    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'detached', timeout: 6000 }).catch(() => {});
   }
 
   /**
@@ -62,9 +70,27 @@ export class OrderingHomePage extends BasePage {
   async login(user: string = config.ordering.user, password?: string): Promise<void> {
     const pass = password || config.ordering.password || '';
 
+    // Check if any popup appeared late and dismiss
+    if (await this.disclaimerButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await this.disclaimerButton.click();
+      await this.disclaimerButton.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+    if (await this.ageVerificationButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await this.ageVerificationButton.click();
+      await this.ageVerificationButton.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+
     // 1. Open drawer
-    await this.headerSignInButton.click({ force: true });
-    await this.page.waitForTimeout(1500);
+    await this.headerSignInButton.waitFor({ state: 'visible', timeout: 20000 });
+    await this.headerSignInButton.click();
+
+    // Ensure drawer is open, retry click if drawer did not open immediately
+    const drawerOpen = await this.drawerSignInButton.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+    if (!drawerOpen) {
+      await this.headerSignInButton.click();
+      await this.drawerSignInButton.waitFor({ state: 'visible', timeout: 15000 });
+    }
 
     // 2. Click Drawer Sign In and wait for Identity Server redirect
     await Promise.all([
@@ -80,6 +106,7 @@ export class OrderingHomePage extends BasePage {
     }
 
     // 4. Fill credentials
+    await this.emailInput.waitFor({ state: 'visible', timeout: 20000 });
     await this.emailInput.fill(user);
     await this.passwordInput.fill(pass);
 
