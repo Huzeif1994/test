@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: './tests',
 
   /* Dev site slow hai (page kholne mein 25-30s), isliye test timeout badhaya */
-  timeout: 60_000,
+  timeout: 90_000,
 
   /* Run tests sequentially to avoid choking slow dev server */
   fullyParallel: false,
@@ -24,8 +24,8 @@ export default defineConfig({
   ],
 
   use: {
-    navigationTimeout: 45_000,
-    actionTimeout: 15_000,
+    navigationTimeout: 60_000,
+    actionTimeout: 20_000,
 
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',

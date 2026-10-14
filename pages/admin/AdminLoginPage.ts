@@ -45,14 +45,11 @@ export class AdminLoginPage extends BasePage {
     await this.passwordInput.fill(pass);
 
     // Submit and wait for redirect back to Admin portal
-    const targetHostname = new URL(config.admin.baseUrl).hostname;
+    const targetHostname = new URL(config.admin.baseUrl).hostname.replace(/\./g, '\\.');
     await this.submitSignInButton.click({ force: true });
 
     // Wait until browser redirects back to Admin portal (away from Identity server)
-    await this.page.waitForURL(
-      (url) => !url.hostname.includes('identity') && url.hostname.includes(targetHostname),
-      { timeout: 45000 }
-    );
+    await expect(this.page).toHaveURL(new RegExp(`^https?://${targetHostname}`), { timeout: 60000 });
 
     await this.page.waitForTimeout(2000);
   }

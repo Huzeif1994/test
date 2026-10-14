@@ -111,21 +111,15 @@ export class OrderingHomePage extends BasePage {
     await this.emailInput.fill(user);
     await this.passwordInput.fill(pass);
 
-    // 5. Submit login and properly wait for redirect away from Identity server
-    const targetHostname = new URL(config.ordering.baseUrl).hostname;
+    // 5. Submit login
+    const targetHostname = new URL(config.ordering.baseUrl).hostname.replace(/\./g, '\\.');
     await this.submitSignInButton.click({ force: true });
 
-    // Wait for redirect back to application (away from Identity server)
-    await this.page.waitForURL(
-      (url) => !url.hostname.includes('identity') && url.hostname.includes(targetHostname),
-      { timeout: 45000 }
-    );
+    // Wait for browser to redirect away from Identity server back to storefront domain
+    await expect(this.page).toHaveURL(new RegExp(`^https?://${targetHostname}`), { timeout: 60000 });
 
     // Wait until callback token exchange finishes and lands on storefront home
-    await this.page.waitForURL(
-      (url) => !url.pathname.includes('/callback'),
-      { timeout: 30000 }
-    );
+    await expect(this.page).not.toHaveURL(/callback/i, { timeout: 60000 });
 
     await this.page.waitForTimeout(2000);
   }
