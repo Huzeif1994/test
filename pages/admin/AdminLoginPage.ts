@@ -35,3 +35,4 @@ export class AdminLoginPage extends BasePage {
     }
   }
 }
+

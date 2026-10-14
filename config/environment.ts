@@ -70,3 +70,4 @@ export const config: SystemConfig = {
   env: currentEnv,
   ...environments[currentEnv],
 };
+

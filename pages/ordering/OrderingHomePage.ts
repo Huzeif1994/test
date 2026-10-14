@@ -10,3 +10,4 @@ export class OrderingHomePage extends BasePage {
     await expect(this.page).toHaveURL(new RegExp(hostname));
   }
 }
+

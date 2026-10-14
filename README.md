@@ -124,3 +124,10 @@ npm run docker:allure
   2. `allure-report`: Teeno apps ke results combine karke single Allure report create hoti hai.
   3. `deploy-report`: `main` branch ke runs ke liye GitHub Pages par live report publish hoti hai (`https://<username>.github.io/<repo>/`).
   4. `docker`: Container build aur smoke test verification.
+  5. `notify`: Test execution outcome aur Allure report ka link directly Outlook email par dispatch hota hai (`huzeif.shaikh@ftxinfotech.com`).
+
+### Outlook Email Setup (GitHub Secrets)
+GitHub Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
+- `MAIL_USERNAME`: Sender email address (e.g. `huzeif.shaikh@ftxinfotech.com`)
+- `MAIL_PASSWORD`: Outlook / Microsoft 365 Password ya App Password
+
