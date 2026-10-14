@@ -11,6 +11,24 @@ on:
 
 env:
   TEST_ENV: ${{ vars.TEST_ENV || 'dev' }}
+  ORDERING_DEV_URL: ${{ vars.ORDERING_DEV_URL || 'https://ftx.dev.ftxcommerce.com' }}
+  ORDERING_DEV_USER: ${{ secrets.ORDERING_DEV_USER }}
+  ORDERING_DEV_PASSWORD: ${{ secrets.ORDERING_DEV_PASSWORD }}
+  ADMIN_DEV_URL: ${{ vars.ADMIN_DEV_URL || 'https://ftx.admin.dev.ftxcommerce.com/' }}
+  ADMIN_DEV_USER: ${{ secrets.ADMIN_DEV_USER }}
+  ADMIN_DEV_PASSWORD: ${{ secrets.ADMIN_DEV_PASSWORD }}
+  FULFILLMENT_DEV_URL: ${{ vars.FULFILLMENT_DEV_URL || 'https://ftx.fulfillment.dev.ftxcommerce.com/' }}
+  FULFILLMENT_DEV_USER: ${{ secrets.FULFILLMENT_DEV_USER }}
+  FULFILLMENT_DEV_PASSWORD: ${{ secrets.FULFILLMENT_DEV_PASSWORD }}
+  ORDERING_STAGING_URL: ${{ vars.ORDERING_STAGING_URL || 'https://ftx.staging.ftxcommerce.com' }}
+  ORDERING_STAGING_USER: ${{ secrets.ORDERING_STAGING_USER }}
+  ORDERING_STAGING_PASSWORD: ${{ secrets.ORDERING_STAGING_PASSWORD }}
+  ADMIN_STAGING_URL: ${{ vars.ADMIN_STAGING_URL || 'https://ftx.admin.staging.ftxcommerce.com/' }}
+  ADMIN_STAGING_USER: ${{ secrets.ADMIN_STAGING_USER }}
+  ADMIN_STAGING_PASSWORD: ${{ secrets.ADMIN_STAGING_PASSWORD }}
+  FULFILLMENT_STAGING_URL: ${{ vars.FULFILLMENT_STAGING_URL || 'https://ftx.fulfillment.staging.ftxcommerce.com/' }}
+  FULFILLMENT_STAGING_USER: ${{ secrets.FULFILLMENT_STAGING_USER }}
+  FULFILLMENT_STAGING_PASSWORD: ${{ secrets.FULFILLMENT_STAGING_PASSWORD }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -149,7 +167,16 @@ jobs:
         run: |
           mkdir -p playwright-report test-results allure-results
           docker run --rm --ipc=host \
-            -e TEST_ENV=${{ env.TEST_ENV }} \
+            -e TEST_ENV="${{ env.TEST_ENV }}" \
+            -e ORDERING_DEV_URL="${{ env.ORDERING_DEV_URL }}" \
+            -e ORDERING_DEV_USER="${{ env.ORDERING_DEV_USER }}" \
+            -e ORDERING_DEV_PASSWORD="${{ env.ORDERING_DEV_PASSWORD }}" \
+            -e ADMIN_DEV_URL="${{ env.ADMIN_DEV_URL }}" \
+            -e ADMIN_DEV_USER="${{ env.ADMIN_DEV_USER }}" \
+            -e ADMIN_DEV_PASSWORD="${{ env.ADMIN_DEV_PASSWORD }}" \
+            -e FULFILLMENT_DEV_URL="${{ env.FULFILLMENT_DEV_URL }}" \
+            -e FULFILLMENT_DEV_USER="${{ env.FULFILLMENT_DEV_USER }}" \
+            -e FULFILLMENT_DEV_PASSWORD="${{ env.FULFILLMENT_DEV_PASSWORD }}" \
             -v "$PWD/playwright-report:/app/playwright-report" \
             -v "$PWD/test-results:/app/test-results" \
             -v "$PWD/allure-results:/app/allure-results" \
