@@ -6,33 +6,56 @@ export class AdminLoginPage extends BasePage {
   protected readonly path = '/';
 
   // Locators
+  readonly landingLoginButton: Locator;
+  readonly useEmailLink: Locator;
   readonly emailInput: Locator;
   readonly passwordInput: Locator;
-  readonly loginButton: Locator;
+  readonly submitSignInButton: Locator;
 
   constructor(page: Page) {
     super(page);
-    this.emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i], input[type="text"]').first();
-    this.passwordInput = page.locator('input[type="password"]');
-    this.loginButton = page.locator('button[type="submit"], button:has-text("Login"), button:has-text("Sign in")').first();
-  }
 
-  async expectLoginPage(): Promise<void> {
-    const hostname = new URL(config.admin.baseUrl).hostname.replace(/\./g, '\\.');
-    await expect(this.page).toHaveURL(new RegExp(hostname));
+    this.landingLoginButton = page.getByRole('button', { name: 'Login', exact: true }).or(page.locator('button:has-text("Login")')).first();
+    this.useEmailLink = page.locator('#lnkShowLoginByEmail');
+    this.emailInput = page.locator('#LoginEmail, input[name="LoginEmail"], input#email, input#Username, input[type="email"]').first();
+    this.passwordInput = page.locator('#Password, input[name="Password"], input[type="password"]').first();
+    this.submitSignInButton = page.locator('#signin, input[type="submit"][value*="Sign In"]').first();
   }
 
   async login(user: string = config.admin.user, password?: string): Promise<void> {
     const pass = password || config.admin.password || '';
-    if (await this.emailInput.isVisible()) {
-      await this.emailInput.fill(user);
+
+    // Click Login on landing page
+    if (await this.landingLoginButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await Promise.all([
+        this.page.waitForURL(/dev-identity/i, { timeout: 30000 }),
+        this.landingLoginButton.click(),
+      ]);
     }
-    if (await this.passwordInput.isVisible()) {
-      await this.passwordInput.fill(pass);
+    await this.page.waitForTimeout(2000);
+
+    // Switch to Email if required
+    if (await this.useEmailLink.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await this.useEmailLink.click();
+      await this.page.waitForTimeout(1000);
     }
-    if (await this.loginButton.isVisible()) {
-      await this.loginButton.click();
-    }
+
+    // Fill credentials
+    await this.emailInput.fill(user);
+    await this.passwordInput.fill(pass);
+
+    // Submit and wait for redirect back
+    const targetHost = new URL(config.admin.baseUrl).hostname.replace(/\./g, '\\.');
+    await Promise.all([
+      this.page.waitForURL(new RegExp(targetHost), { timeout: 45000 }).catch(() => {}),
+      this.submitSignInButton.click(),
+    ]);
+
+    await this.page.waitForTimeout(3000);
+  }
+
+  async expectLoggedIn(): Promise<void> {
+    const targetHost = new URL(config.admin.baseUrl).hostname.replace(/\./g, '\\.');
+    await expect(this.page).toHaveURL(new RegExp(targetHost));
   }
 }
-
