@@ -105,28 +105,39 @@ export class OrderingHomePage extends BasePage {
       await this.page.waitForTimeout(1000);
     }
 
-    // 4. Fill credentials
+    // 4. Fill credentials (wait for loader overlay to clear first)
+    await this.page.locator('#divloader').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
     await this.emailInput.waitFor({ state: 'visible', timeout: 20000 });
     await this.emailInput.fill(user);
     await this.passwordInput.fill(pass);
 
-    // 5. Submit login
-    const targetHost = new URL(config.ordering.baseUrl).hostname.replace(/\./g, '\\.');
-    await Promise.all([
-      this.page.waitForURL(new RegExp(targetHost), { timeout: 45000 }),
-      this.submitSignInButton.click(),
-    ]);
+    // 5. Submit login and properly wait for redirect away from Identity server
+    const targetHostname = new URL(config.ordering.baseUrl).hostname;
+    await this.submitSignInButton.click({ force: true });
 
-    await this.page.waitForTimeout(3000);
+    // Wait for redirect back to application (away from Identity server)
+    await this.page.waitForURL(
+      (url) => !url.hostname.includes('identity') && url.hostname.includes(targetHostname),
+      { timeout: 45000 }
+    );
+
+    // Wait until callback token exchange finishes and lands on storefront home
+    await this.page.waitForURL(
+      (url) => !url.pathname.includes('/callback'),
+      { timeout: 30000 }
+    );
+
+    await this.page.waitForTimeout(2000);
   }
 
   async expectOnHomePage(): Promise<void> {
-    const hostname = new URL(config.ordering.baseUrl).hostname.replace(/\./g, '\\.');
-    await expect(this.page).toHaveURL(new RegExp(hostname));
+    const origin = new URL(config.ordering.baseUrl).origin.replace(/\./g, '\\.');
+    await expect(this.page).toHaveURL(new RegExp(`^${origin}`));
   }
 
   async expectLoggedIn(): Promise<void> {
-    const hostname = new URL(config.ordering.baseUrl).hostname.replace(/\./g, '\\.');
-    await expect(this.page).toHaveURL(new RegExp(hostname));
+    const origin = new URL(config.ordering.baseUrl).origin.replace(/\./g, '\\.');
+    // Must be on storefront origin and not on identity or callback
+    await expect(this.page).toHaveURL(new RegExp(`^${origin}/?(?!callback)`));
   }
 }

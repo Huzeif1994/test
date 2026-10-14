@@ -38,23 +38,27 @@ export class AdminLoginPage extends BasePage {
       await this.page.waitForTimeout(1000);
     }
 
-    // Wait for email input on Identity server
+    // Wait for loader overlay to disappear and email input to be visible
+    await this.page.locator('#divloader').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
     await this.emailInput.waitFor({ state: 'visible', timeout: 30000 });
     await this.emailInput.fill(user);
     await this.passwordInput.fill(pass);
 
-    // Submit and wait for redirect back
-    const targetHost = new URL(config.admin.baseUrl).hostname.replace(/\./g, '\\.');
-    await Promise.all([
-      this.page.waitForURL(new RegExp(targetHost), { timeout: 45000 }),
-      this.submitSignInButton.click(),
-    ]);
+    // Submit and wait for redirect back to Admin portal
+    const targetHostname = new URL(config.admin.baseUrl).hostname;
+    await this.submitSignInButton.click({ force: true });
 
-    await this.page.waitForTimeout(3000);
+    // Wait until browser redirects back to Admin portal (away from Identity server)
+    await this.page.waitForURL(
+      (url) => !url.hostname.includes('identity') && url.hostname.includes(targetHostname),
+      { timeout: 45000 }
+    );
+
+    await this.page.waitForTimeout(2000);
   }
 
   async expectLoggedIn(): Promise<void> {
-    const targetHost = new URL(config.admin.baseUrl).hostname.replace(/\./g, '\\.');
-    await expect(this.page).toHaveURL(new RegExp(targetHost));
+    const origin = new URL(config.admin.baseUrl).origin.replace(/\./g, '\\.');
+    await expect(this.page).toHaveURL(new RegExp(`^${origin}`));
   }
 }
