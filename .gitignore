@@ -11,5 +11,7 @@ allure-results/
 allure-report/
 allure-history.jsonl
 
-# Secrets (aage login setup ke liye)
+# Secrets
 .env
+.env.*
+!.env.example

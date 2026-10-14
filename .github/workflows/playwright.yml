@@ -10,14 +10,14 @@ on:
     - cron: '45 6 * * *'   # roz dopahar 12:15 PM IST (06:45 UTC)
 
 env:
-  BASE_URL: https://ftx.dev.ftxcommerce.com
+  TEST_ENV: ${{ vars.TEST_ENV || 'dev' }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Job 1: Normal run (Docker ke bina), 3 browsers parallel
+  # Job 1: Normal run (Docker ke bina), 3 apps parallel
   test:
     name: Tests (${{ matrix.project }})
     runs-on: ubuntu-24.04
@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [chromium, firefox, webkit]
+        project: [ordering, admin, fulfillment]
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +37,7 @@ jobs:
       - run: npm ci
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps ${{ matrix.project }}
+        run: npx playwright install --with-deps chromium
 
       - name: Run tests
         run: npx playwright test --project=${{ matrix.project }}
@@ -149,11 +149,11 @@ jobs:
         run: |
           mkdir -p playwright-report test-results allure-results
           docker run --rm --ipc=host \
-            -e BASE_URL=${{ env.BASE_URL }} \
+            -e TEST_ENV=${{ env.TEST_ENV }} \
             -v "$PWD/playwright-report:/app/playwright-report" \
             -v "$PWD/test-results:/app/test-results" \
             -v "$PWD/allure-results:/app/allure-results" \
-            playwright-huzeif:ci npx playwright test --project=chromium
+            playwright-huzeif:ci npx playwright test --project=ordering
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

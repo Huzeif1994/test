@@ -2,9 +2,12 @@ services:
   playwright:
     build: .
     image: playwright-huzeif:latest
+    env_file:
+      - path: .env
+        required: false
     environment:
       - CI=true
-      - BASE_URL=${BASE_URL:-https://ftx.dev.ftxcommerce.com}
+      - TEST_ENV=${TEST_ENV:-dev}
     # Reports host machine par aa jayengi
     volumes:
       - ./playwright-report:/app/playwright-report

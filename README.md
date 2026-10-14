@@ -1,32 +1,82 @@
 # playwright-huzeif
 
-Playwright automated testing framework with TypeScript, Docker, Allure Reporting, and GitHub Actions CI/CD.
+Playwright automated testing framework with TypeScript, Multi-App Support, Docker, Allure Reporting, and GitHub Actions CI/CD.
+
+## Applications Covered
+
+This framework supports 3 independent applications across multiple environments (**Dev** & **Staging**):
+
+1. **Online Ordering**: Customer storefront (`https://ftx.dev.ftxcommerce.com` / `https://ftx.staging.ftxcommerce.com`)
+2. **Admin Portal**: Merchant administration (`https://ftx.admin.dev.ftxcommerce.com/` / `https://ftx.admin.staging.ftxcommerce.com/`)
+3. **Fulfillment App**: Operations & dispatch (`https://ftx.fulfillment.dev.ftxcommerce.com/` / `https://ftx.fulfillment.staging.ftxcommerce.com/`)
+
+---
 
 ## Quick Start (Local Setup)
 
 > **Important**: Open the `playwright-huzeif` directory directly as your workspace root in VS Code.
 
 ```bash
-# Dependencies install karo
+# 1. Dependencies install karo
 npm ci
 
-# Playwright browsers download karo
-npx playwright install
+# 2. Playwright browser install karo
+npx playwright install chromium
 
-# TypeScript typecheck
+# 3. .env file create karo (.env.example se copy karke credentials configure karein)
+cp .env.example .env
+
+# 4. TypeScript typecheck karo
 npm run typecheck
 
-# Tests run karo
+# 5. Saare apps ke tests run karo (Default: Dev environment)
 npm test
+```
 
-# Playwright HTML report dekho
+---
+
+## Running Tests by Application
+
+Aap specific app ke tests alag se run kar sakte hain:
+
+```bash
+# 1. Online Ordering app
+npm run test:ordering
+
+# 2. Admin Portal
+npm run test:admin
+
+# 3. Fulfillment App
+npm run test:fulfillment
+
+# Headed mode (Browser UI visible)
+npm run test:headed
+
+# Playwright interactive UI mode
+npm run test:ui
+
+# Playwright HTML report view karo
 npm run report
 ```
 
-### Additional Test Runners
-- `npm run test:chromium` - Sirf Chromium par tests chalao
-- `npm run test:headed` - Headed mode (browser UI open karke) test chalao
-- `npm run test:ui` - Playwright Interactive UI Mode
+---
+
+## Environment Switching (Dev vs Staging)
+
+Environment switch karne ke liye `.env` file mein `TEST_ENV` change karein ya command line se pass karein:
+
+```bash
+# Staging environment par sabhi tests run karo
+TEST_ENV=staging npx playwright test
+
+# Staging par sirf Admin tests run karo
+TEST_ENV=staging npm run test:admin
+
+# Dev environment par run karo
+TEST_ENV=dev npm test
+```
+
+Credentials aur URLs `config/environment.ts` ke through automatically Dev ya Staging ke hisaab se load hote hain.
 
 ---
 
@@ -61,21 +111,7 @@ npm run docker:test
 
 # Docker test chala kar Allure report auto open karo
 npm run docker:allure
-
-# Custom Base URL ke sath Docker run
-docker run --rm --ipc=host -e BASE_URL=https://ftx.dev.ftxcommerce.com playwright-huzeif:latest
 ```
-
-> **Note**: `Dockerfile` ka image tag (`v1.64.0-noble`) aur `package.json` ka `@playwright/test` version hamesha match hone chahiye.
-
----
-
-## Environment Variables
-
-- `BASE_URL`: Target environment URL (Default: `https://ftx.dev.ftxcommerce.com`).
-  ```bash
-  BASE_URL=https://staging.ftxcommerce.com npm test
-  ```
 
 ---
 
@@ -84,8 +120,7 @@ docker run --rm --ipc=host -e BASE_URL=https://ftx.dev.ftxcommerce.com playwrigh
 `.github/workflows/playwright.yml`:
 - **Triggers**: Push on `main`/`master`, Pull Requests, Daily Schedule (12:15 PM IST / 06:45 UTC), aur Manual Dispatch.
 - **Jobs**:
-  1. `test`: Chromium, Firefox, WebKit par parallel matrix run.
-  2. `allure-report`: Saare browser results jodkar unified Allure report create hoti hai.
+  1. `test`: **3 Apps Parallel Matrix** (`ordering`, `admin`, `fulfillment`).
+  2. `allure-report`: Teeno apps ke results combine karke single Allure report create hoti hai.
   3. `deploy-report`: `main` branch ke runs ke liye GitHub Pages par live report publish hoti hai (`https://<username>.github.io/<repo>/`).
   4. `docker`: Container build aur smoke test verification.
-

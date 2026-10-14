@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { config } from './config/environment';
 
 export default defineConfig({
   testDir: './tests',
@@ -28,7 +29,6 @@ export default defineConfig({
       ],
 
   use: {
-    baseURL: process.env.BASE_URL || 'https://ftx.dev.ftxcommerce.com',
     navigationTimeout: 45_000,
     actionTimeout: 15_000,
 
@@ -39,16 +39,28 @@ export default defineConfig({
 
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'ordering',
+      testDir: './tests/ordering',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: config.ordering.baseUrl,
+      },
     },
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: 'admin',
+      testDir: './tests/admin',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: config.admin.baseUrl,
+      },
     },
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: 'fulfillment',
+      testDir: './tests/fulfillment',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: config.fulfillment.baseUrl,
+      },
     },
   ],
 });
