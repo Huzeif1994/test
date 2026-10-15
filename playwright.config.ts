@@ -27,6 +27,12 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 20_000,
 
+    /* Maximize browser screen */
+    viewport: null,
+    launchOptions: {
+      args: ['--start-maximized'],
+    },
+
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -38,6 +44,7 @@ export default defineConfig({
       testDir: './tests/ordering',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: null,
         baseURL: config.ordering.baseUrl,
       },
     },
@@ -46,6 +53,7 @@ export default defineConfig({
       testDir: './tests/admin',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: null,
         baseURL: config.admin.baseUrl,
       },
     },
@@ -54,6 +62,7 @@ export default defineConfig({
       testDir: './tests/fulfillment',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: null,
         baseURL: config.fulfillment.baseUrl,
       },
     },
