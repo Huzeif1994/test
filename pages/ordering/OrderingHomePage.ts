@@ -20,7 +20,7 @@ export class OrderingHomePage extends BasePage {
 
     // Popups
     this.disclaimerButton = page.locator('button, a').filter({ hasText: /I understand\.?\s*Proceed to Store/i }).first();
-    this.ageVerificationButton = page.locator('button, a').filter({ hasText: /21\+|I'm 21\+/i }).first();
+    this.ageVerificationButton = page.locator('#age-verification-modal button:has-text("Skip"), #age-verification-modal button:has-text("21+"), button:has-text("21+"), button:has-text("I\'m 21+"), button:has-text("Skip")').first();
 
     // Storefront Navigation
     this.headerSignInButton = page.locator('.account-notifaction, header button:has-text("Sign In"), header button:has-text("Sign In Account")').first();
@@ -50,17 +50,31 @@ export class OrderingHomePage extends BasePage {
   /**
    * Handle Age Verification Modal (21+) if enabled on store
    */
-  async handleAgeVerification(timeout: number = 8000): Promise<void> {
+  async handleAgeVerification(timeout: number = 15000): Promise<void> {
+    const modal = this.page.locator('#age-verification-modal, .avmodalDialog');
+    const skipButton = modal.locator('button').filter({ hasText: /^Skip$/i }).or(this.page.getByRole('button', { name: 'Skip', exact: true }));
+    const ageButton = modal.locator('button, a').filter({ hasText: /21\+|I'm 21\+/i }).or(this.page.locator('button, a').filter({ hasText: /21\+|I'm 21\+/i }));
+
     try {
-      await this.ageVerificationButton.waitFor({ state: 'visible', timeout });
-      await this.ageVerificationButton.click();
-      await this.ageVerificationButton.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+      // Dev server takes 8-12 seconds to fetch store settings and mount age modal
+      await modal.waitFor({ state: 'visible', timeout });
+
+      if (await skipButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await skipButton.click();
+      } else if (await ageButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await ageButton.click();
+      } else {
+        await modal.locator('button').first().click();
+      }
+
+      await modal.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
       await this.page.waitForTimeout(1000);
     } catch {
       // Age verification didn't appear (may not be enabled)
     }
-    // Wait for Quasar dialog backdrop overlay to detach
-    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'detached', timeout: 6000 }).catch(() => {});
+
+    // Wait for Quasar dialog backdrop overlay and age modal to detach
+    await this.page.locator('.q-dialog__backdrop, #age-verification-modal, .avmodalDialog').waitFor({ state: 'detached', timeout: 6000 }).catch(() => {});
   }
 
   /**
@@ -71,15 +85,9 @@ export class OrderingHomePage extends BasePage {
     const pass = password || config.ordering.password || '';
 
     // Check if any popup appeared late and dismiss
-    if (await this.disclaimerButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await this.disclaimerButton.click();
-      await this.disclaimerButton.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    }
-    if (await this.ageVerificationButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await this.ageVerificationButton.click();
-      await this.ageVerificationButton.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    }
-    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    await this.handleDisclaimer(2000);
+    await this.handleAgeVerification(5000);
+    await this.page.locator('.q-dialog__backdrop, #age-verification-modal, .avmodalDialog').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
 
     // 1. Open drawer
     await this.headerSignInButton.waitFor({ state: 'visible', timeout: 20000 });
@@ -88,6 +96,8 @@ export class OrderingHomePage extends BasePage {
     // Ensure drawer is open, retry click if drawer did not open immediately
     const drawerOpen = await this.drawerSignInButton.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
     if (!drawerOpen) {
+      // Check if age modal popped up right when header was clicked
+      await this.handleAgeVerification(3000);
       await this.headerSignInButton.click();
       await this.drawerSignInButton.waitFor({ state: 'visible', timeout: 15000 });
     }
