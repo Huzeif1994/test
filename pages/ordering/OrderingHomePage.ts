@@ -147,10 +147,15 @@ export class OrderingHomePage extends BasePage {
       await this.drawerSignInButton.waitFor({ state: 'visible', timeout: 15000 });
     }
 
+    // Wait for drawer slide-in animation to complete
+    await this.page.waitForTimeout(800);
+    await this.drawerSignInButton.scrollIntoViewIfNeeded().catch(() => {});
+
     // 2. Click Drawer Sign In and wait for Identity Server redirect
+    await this.dismissAllPopups(2000);
     await Promise.all([
       this.page.waitForURL(/dev-identity|Identity|Login/i, { timeout: 30000 }),
-      this.drawerSignInButton.click(),
+      this.drawerSignInButton.click().catch(() => this.drawerSignInButton.dispatchEvent('click')),
     ]);
     await this.page.waitForTimeout(2000);
 
