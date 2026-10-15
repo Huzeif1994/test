@@ -6,6 +6,8 @@ import { FulfillmentLoginPage } from '../pages/fulfillment/FulfillmentLoginPage'
 import { FulfillmentSidebar } from '../pages/fulfillment/navigation/FulfillmentSidebar';
 import { PendingOrdersPage } from '../pages/fulfillment/orders/PendingOrdersPage';
 import { ReadyOrdersPage } from '../pages/fulfillment/orders/ReadyOrdersPage';
+import { StorePickupDetailPage } from '../pages/fulfillment/detail/StorePickupDetailPage';
+import { VerifyAgeModal } from '../pages/fulfillment/modals/VerifyAgeModal';
 
 /**
  * Custom fixtures: tests mein seedha page instance mil jayega,
@@ -19,6 +21,8 @@ type Pages = {
   fulfillmentSidebar: FulfillmentSidebar;
   pendingOrdersPage: PendingOrdersPage;
   readyOrdersPage: ReadyOrdersPage;
+  storePickupDetailPage: StorePickupDetailPage;
+  verifyAgeModal: VerifyAgeModal;
 };
 
 export const test = base.extend<Pages>({
@@ -42,6 +46,12 @@ export const test = base.extend<Pages>({
   },
   readyOrdersPage: async ({ page }, use) => {
     await use(new ReadyOrdersPage(page));
+  },
+  storePickupDetailPage: async ({ page }, use) => {
+    await use(new StorePickupDetailPage(page));
+  },
+  verifyAgeModal: async ({ page }, use) => {
+    await use(new VerifyAgeModal(page));
   },
 });
 

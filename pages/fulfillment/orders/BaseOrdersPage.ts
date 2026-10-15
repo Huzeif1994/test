@@ -18,7 +18,7 @@ export abstract class BaseOrdersPage extends BasePage {
 
     this.tableTitle = page.locator('.tableTitle').first();
     this.searchInput = page.locator('input[placeholder="Search"]').first();
-    this.tableRows = page.locator('.q-table tbody tr');
+    this.tableRows = page.locator('.q-table tbody tr.cursor-pointer');
     this.loadingSpinner = page.locator('.q-table__loading, .q-spinner').first();
     this.noDataLabel = page.locator('.no-data, text="No record(s) found."').first();
     this.brandStoreFilter = page.locator('.select-ellipsis, label:has-text("Select Brand Store")').first();
@@ -71,12 +71,26 @@ export abstract class BaseOrdersPage extends BasePage {
   }
 
   /**
+   * Dismiss floating promotional or update banners
+   */
+  async dismissPromoBanners(): Promise<void> {
+    await this.page.evaluate(() => {
+      const banner = document.querySelector('#q-notify .install-app-modal');
+      if (banner) banner.remove();
+      const notify = document.querySelector('#q-notify');
+      if (notify) notify.remove();
+    }).catch(() => {});
+  }
+
+  /**
    * Click an order row by order number
    */
   async clickOrderRow(orderNumber: string): Promise<void> {
     await this.expectTableLoaded();
+    await this.dismissPromoBanners();
     const row = this.tableRows.filter({ hasText: orderNumber }).first();
     await row.waitFor({ state: 'visible', timeout: 15000 });
+    await row.scrollIntoViewIfNeeded().catch(() => {});
     await row.click();
   }
 
@@ -85,11 +99,15 @@ export abstract class BaseOrdersPage extends BasePage {
    */
   async clickFirstOrderRow(): Promise<void> {
     await this.expectTableLoaded();
+    await this.dismissPromoBanners();
     const count = await this.getRowCount();
     if (count === 0) {
       throw new Error(`Cannot click first order row: table has no records.`);
     }
-    await this.tableRows.first().click();
+    const row = this.tableRows.first();
+    await row.waitFor({ state: 'visible', timeout: 15000 });
+    await row.scrollIntoViewIfNeeded().catch(() => {});
+    await row.click();
   }
 }
 

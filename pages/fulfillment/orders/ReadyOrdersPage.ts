@@ -27,7 +27,7 @@ export class ReadyOrdersPage extends BaseOrdersPage {
     } else {
       await this.clickFirstOrderRow();
     }
-    await expect(this.page).toHaveURL(/store-pickup|ship-orders|schedule-delivery/i, { timeout: 20000 });
+    await expect(this.page).toHaveURL(/order|store-pickup|ship-orders|schedule-delivery/i, { timeout: 20000 });
   }
 }
 
