@@ -57,5 +57,8 @@ export class FulfillmentLoginPage extends BasePage {
   async expectLoggedIn(): Promise<void> {
     const origin = new URL(config.fulfillment.baseUrl).origin.replace(/\./g, '\\.');
     await expect(this.page).toHaveURL(new RegExp(`^${origin}`));
+
+    // Wait 2 seconds so the user can visually confirm the real dashboard is loaded
+    await this.page.waitForTimeout(2000);
   }
 }

@@ -133,5 +133,8 @@ export class OrderingHomePage extends BasePage {
     const origin = new URL(config.ordering.baseUrl).origin.replace(/\./g, '\\.');
     // Must be on storefront origin and not on identity or callback
     await expect(this.page).toHaveURL(new RegExp(`^${origin}/?(?!callback)`));
+
+    // Wait 2 seconds so the user can visually confirm the real storefront is loaded
+    await this.page.waitForTimeout(2000);
   }
 }
