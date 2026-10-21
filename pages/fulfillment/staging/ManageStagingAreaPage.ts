@@ -8,7 +8,7 @@ import { BasePage } from '../../BasePage';
 export class ManageStagingAreaPage extends BasePage {
   protected readonly path = '/manage-staging-area';
 
-  readonly title: Locator;
+  readonly pageTitle: Locator;
   readonly searchInput: Locator;
   readonly addStagingAreaButton: Locator;
   readonly stagingAreaRows: Locator;
@@ -17,7 +17,7 @@ export class ManageStagingAreaPage extends BasePage {
   constructor(page: Page) {
     super(page);
 
-    this.title = page.locator('main').getByText('Staging Area').first();
+    this.pageTitle = page.locator('main').getByText('Staging Area').first();
     this.searchInput = page.locator('input[placeholder*="search" i], input[type="search"]').first();
     this.addStagingAreaButton = page.locator('button').filter({ hasText: /Add/i }).first();
     this.stagingTable = page.locator('.q-table, .ftx-table, table').first();
@@ -26,8 +26,8 @@ export class ManageStagingAreaPage extends BasePage {
 
   async expectOnManageStagingAreaPage(): Promise<void> {
     await expect(this.page).toHaveURL(/manage-staging-area/i, { timeout: 15000 });
-    await this.title.waitFor({ state: 'visible', timeout: 15000 });
-    await expect(this.title).toBeVisible();
+    await this.pageTitle.waitFor({ state: 'visible', timeout: 15000 });
+    await expect(this.pageTitle).toBeVisible();
   }
 
   async expectTableLoaded(): Promise<void> {

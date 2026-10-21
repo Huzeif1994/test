@@ -20,6 +20,7 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
   });
 
   test('Customer adds item to cart and proceeds to cart review @ordering @cart', async ({
+    page,
     orderingCatalogPage,
   }) => {
     await allure.epic('Online Ordering');
@@ -33,7 +34,7 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
 
     await test.step('Open cart drawer and proceed to Cart page', async () => {
       await orderingCatalogPage.openCartAndProceed();
-      await expect(orderingCatalogPage.page).toHaveURL(/\/cart/i);
+      await expect(page).toHaveURL(/\/cart/i);
     });
   });
 

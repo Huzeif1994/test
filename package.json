@@ -7,6 +7,7 @@
     "test:ordering": "playwright test --project=ordering",
     "test:admin": "playwright test --project=admin",
     "test:fulfillment": "playwright test --project=fulfillment",
+    "test:e2e-bridge": "playwright test --project=e2e-bridge",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit",

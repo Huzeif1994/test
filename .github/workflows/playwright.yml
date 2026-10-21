@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ordering, admin, fulfillment]
+        project: [ordering, admin, fulfillment, e2e-bridge]
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +53,9 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
@@ -177,6 +180,15 @@ jobs:
             -e FULFILLMENT_DEV_URL="${{ env.FULFILLMENT_DEV_URL }}" \
             -e FULFILLMENT_DEV_USER="${{ env.FULFILLMENT_DEV_USER }}" \
             -e FULFILLMENT_DEV_PASSWORD="${{ env.FULFILLMENT_DEV_PASSWORD }}" \
+            -e ORDERING_STAGING_URL="${{ env.ORDERING_STAGING_URL }}" \
+            -e ORDERING_STAGING_USER="${{ env.ORDERING_STAGING_USER }}" \
+            -e ORDERING_STAGING_PASSWORD="${{ env.ORDERING_STAGING_PASSWORD }}" \
+            -e ADMIN_STAGING_URL="${{ env.ADMIN_STAGING_URL }}" \
+            -e ADMIN_STAGING_USER="${{ env.ADMIN_STAGING_USER }}" \
+            -e ADMIN_STAGING_PASSWORD="${{ env.ADMIN_STAGING_PASSWORD }}" \
+            -e FULFILLMENT_STAGING_URL="${{ env.FULFILLMENT_STAGING_URL }}" \
+            -e FULFILLMENT_STAGING_USER="${{ env.FULFILLMENT_STAGING_USER }}" \
+            -e FULFILLMENT_STAGING_PASSWORD="${{ env.FULFILLMENT_STAGING_PASSWORD }}" \
             -v "$PWD/playwright-report:/app/playwright-report" \
             -v "$PWD/test-results:/app/test-results" \
             -v "$PWD/allure-results:/app/allure-results" \
@@ -230,7 +242,7 @@ jobs:
           echo "| **Environment** | \`${{ env.TEST_ENV }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Branch / Ref** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Triggered By** | @${{ github.actor }} (${{ github.event_name }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Apps Tested** | Online Ordering, Admin Portal, Fulfillment App |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Apps Tested** | Online Ordering, Admin Portal, Fulfillment App, Cross-App E2E Bridge |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Reports:" >> $GITHUB_STEP_SUMMARY
           echo "- 🌐 **[Live Allure Report (GitHub Pages)](https://huzeif1994.github.io/test/)**" >> $GITHUB_STEP_SUMMARY
@@ -286,7 +298,7 @@ jobs:
                     <tr><td class="label">Branch:</td><td>${{ github.ref_name }}</td></tr>
                     <tr><td class="label">Commit:</td><td><code>${{ github.sha }}</code></td></tr>
                     <tr><td class="label">Triggered By:</td><td>${{ github.actor }} (${{ github.event_name }})</td></tr>
-                    <tr><td class="label">Apps Tested:</td><td>Online Ordering, Admin Portal, Fulfillment App</td></tr>
+                    <tr><td class="label">Apps Tested:</td><td>Online Ordering, Admin Portal, Fulfillment App, Cross-App E2E Bridge</td></tr>
                   </table>
                   <div>
                     <a href="https://huzeif1994.github.io/test/" class="btn">📊 View Live Allure Report</a>
