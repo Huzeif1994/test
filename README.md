@@ -37,17 +37,20 @@ npm test
 
 ## Running Tests by Application
 
-Aap specific app ke tests alag se run kar sakte hain:
+Aap specific app ya flow ke tests alag se run kar sakte hain:
 
 ```bash
-# 1. Online Ordering app
+# 1. Online Ordering app (Storefront catalog, cart, checkout)
 npm run test:ordering
 
-# 2. Admin Portal
+# 2. Admin Portal (Age verification settings 5 scenarios)
 npm run test:admin
 
-# 3. Fulfillment App
+# 3. Fulfillment App (Pending, In-Progress, Fulfilled, All Orders, Staging Area)
 npm run test:fulfillment
+
+# 4. Cross-App E2E Integration Bridge (Online Ordering -> Fulfillment Picking & Staging)
+npm run test:e2e-bridge
 
 # Headed mode (Browser UI visible)
 npm run test:headed
@@ -58,6 +61,28 @@ npm run test:ui
 # Playwright HTML report view karo
 npm run report
 ```
+
+---
+
+## Test Suites & Coverage
+
+| Module / Project | Scope & Scenarios Covered | Spec File |
+|---|---|---|
+| **Admin Portal** (`admin`) | • Scenario 1: Main "Enable Age Verification" toggle<br>• Scenario 2: Age verification before viewing products<br>• Scenario 3: Age verification during checkout<br>• Scenarios 4 & 5: Age verification at fulfillment with manual DOB fallback | `tests/admin/admin-age-verification-settings.spec.ts` |
+| **Online Ordering** (`ordering`) | • Storefront category browsing & skeleton loader wait<br>• Product addition to cart & Cart page review<br>• Multi-step checkout with "Pay At Store"<br>• Dynamic legal authorization toggle & order placement confirmation | `tests/ordering/ordering-storefront-flow.spec.ts` |
+| **Cross-App Bridge** (`e2e-bridge`) | • Customer places real order on Online Ordering storefront<br>• Extracts Order ID across app boundaries<br>• Fulfillment employee searches order & opens details<br>• Picks linked items, assigns staging package, and marks Ready | `tests/e2e-bridge/cross-app-ordering-to-fulfillment.spec.ts` |
+| **Fulfillment App** (`fulfillment`) | • Pending Orders 5-action menu, search, pagination<br>• End-to-end Picking workflow: Item Picking -> Delivery Handling -> Staging -> Mark Ready<br>• In Progress Orders table & status validation<br>• Fulfilled Orders table & order history<br>• All Orders table & search filters<br>• Manage Staging Area location inventory | `tests/fulfillment/fulfillment-pending-orders.spec.ts`<br>`tests/fulfillment/fulfillment-sidebar-modules.spec.ts` |
+
+---
+
+## Session Management & Authentication Architecture
+
+Har app ke liye Playwright `storageState` session caching use karta hai, jisse bar bar credentials fill karne ki zaroorat nahi padti:
+- **Fulfillment**: `tests/setup/auth.fulfillment.setup.ts` → `.auth/fulfillment.json`
+- **Admin**: `tests/setup/auth.admin.setup.ts` → `.auth/admin.json`
+- **Online Ordering**: `tests/setup/auth.ordering.setup.ts` → `.auth/ordering.json`
+
+Setup projects `playwright.config.ts` ke dependencies ke roop mein automatically execute hote hain.
 
 ---
 
@@ -120,10 +145,10 @@ npm run docker:allure
 `.github/workflows/playwright.yml`:
 - **Triggers**: Push on `main`/`master`, Pull Requests, Daily Schedule (12:15 PM IST / 06:45 UTC), aur Manual Dispatch.
 - **Jobs**:
-  1. `test`: **3 Apps Parallel Matrix** (`ordering`, `admin`, `fulfillment`).
-  2. `allure-report`: Teeno apps ke results combine karke single Allure report create hoti hai.
+  1. `test`: **4 Parallel Matrix Jobs** (`ordering`, `admin`, `fulfillment`, `e2e-bridge`) with automated TypeScript type checking (`npm run typecheck`).
+  2. `allure-report`: Sabhi suites ke Allure results combine karke single unified Allure report create hoti hai.
   3. `deploy-report`: `main` branch ke runs ke liye GitHub Pages par live report publish hoti hai (`https://<username>.github.io/<repo>/`).
-  4. `docker`: Container build aur smoke test verification.
+  4. `docker`: Container build aur containerized smoke test execution.
   5. `notify`: Test execution outcome aur Allure report ka link directly Outlook email par dispatch hota hai (`huzeif.shaikh@ftxinfotech.com`).
 
 ### Outlook Email Setup (GitHub Secrets)
