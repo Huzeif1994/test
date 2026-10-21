@@ -15,6 +15,8 @@ import { DeliveryHandlingDrawer } from '../pages/fulfillment/modals/DeliveryHand
 import { PickOrderPackagePage } from '../pages/fulfillment/picking/PickOrderPackagePage';
 import { AssignStagingDrawer } from '../pages/fulfillment/modals/AssignStagingDrawer';
 import { AgeVerificationSettingsPage } from '../pages/admin/settings/AgeVerificationSettingsPage';
+import { OrderingCatalogPage } from '../pages/ordering/OrderingCatalogPage';
+import { OrderingCheckoutPage } from '../pages/ordering/OrderingCheckoutPage';
 
 /**
  * Custom fixtures: tests mein seedha page instance mil jayega,
@@ -23,6 +25,8 @@ import { AgeVerificationSettingsPage } from '../pages/admin/settings/AgeVerifica
 type Pages = {
   homePage: HomePage;
   orderingHomePage: OrderingHomePage;
+  orderingCatalogPage: OrderingCatalogPage;
+  orderingCheckoutPage: OrderingCheckoutPage;
   adminLoginPage: AdminLoginPage;
   ageVerificationSettingsPage: AgeVerificationSettingsPage;
   fulfillmentLoginPage: FulfillmentLoginPage;
@@ -45,6 +49,12 @@ export const test = base.extend<Pages>({
   },
   orderingHomePage: async ({ page }, use) => {
     await use(new OrderingHomePage(page));
+  },
+  orderingCatalogPage: async ({ page }, use) => {
+    await use(new OrderingCatalogPage(page));
+  },
+  orderingCheckoutPage: async ({ page }, use) => {
+    await use(new OrderingCheckoutPage(page));
   },
   adminLoginPage: async ({ page }, use) => {
     await use(new AdminLoginPage(page));

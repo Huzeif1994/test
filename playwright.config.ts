@@ -64,11 +64,21 @@ export default defineConfig({
       },
     },
     {
-      name: 'ordering',
-      testDir: './tests/ordering',
+      name: 'setup-ordering',
+      testMatch: /auth\.ordering\.setup\.ts/,
       use: {
         ...desktopChrome,
         baseURL: config.ordering.baseUrl,
+      },
+    },
+    {
+      name: 'ordering',
+      testDir: './tests/ordering',
+      dependencies: ['setup-ordering'],
+      use: {
+        ...desktopChrome,
+        baseURL: config.ordering.baseUrl,
+        storageState: '.auth/ordering.json',
       },
     },
     {
