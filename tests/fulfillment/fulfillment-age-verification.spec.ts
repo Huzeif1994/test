@@ -16,9 +16,8 @@ test.describe('Fulfillment Age Verification Suite (Scenarios 4 & 5)', () => {
     await allure.story('Customer Age Verification during Pickup (Scenarios 4 & 5)');
     await allure.severity('critical');
 
-    await test.step('Authenticate via Identity Server and verify landing', async () => {
-      await fulfillmentLoginPage.goto();
-      await fulfillmentLoginPage.login();
+    await test.step('Verify Dashboard landing using saved authenticated session', async () => {
+      await page.goto('/');
       await fulfillmentLoginPage.expectLoggedIn();
     });
 

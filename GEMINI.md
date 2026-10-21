@@ -24,3 +24,4 @@ This project integrates **TestDino Playwright Skill** (`.agents/skills/playwrigh
 - **Sequential Execution**: Maintain `workers: 1` to prevent dev server throttling.
 - **Visual Pause**: Retain a 2-second visual pause on `expectLoggedIn()` so headed test execution is clearly observable.
 - **Maximized Viewport**: Keep `viewport: null` and `--start-maximized` in `playwright.config.ts`.
+

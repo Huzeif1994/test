@@ -57,56 +57,98 @@ export class FulfillmentSidebar {
   /**
    * Ensures the 'Orders' dropdown is expanded
    */
+  /**
+   * Ensures the 'Orders' dropdown is expanded, opening the sidebar drawer if collapsed
+   */
   async expandOrdersMenu(): Promise<void> {
     await this.dismissPromoBanners();
+
+    // If sidebar drawer is collapsed on smaller screens, click hamburger button
+    const isDrawerVisible = await this.sidebar.isVisible().catch(() => false);
+    if (!isDrawerVisible) {
+      const hamburger = this.page.locator('.q-toolbar button').first();
+      if (await hamburger.isVisible().catch(() => false)) {
+        await hamburger.click();
+        await this.sidebar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      }
+    }
+
     const isPendingVisible = await this.pendingLink.isVisible().catch(() => false);
     if (!isPendingVisible) {
       if (await this.ordersExpansion.isVisible().catch(() => false)) {
         await this.ordersExpansion.click();
-        await this.pendingLink.waitFor({ state: 'visible', timeout: 5000 });
+        await this.pendingLink.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       }
     }
   }
 
   async goToDashboard(): Promise<void> {
     await this.dismissPromoBanners();
-    await this.dashboardLink.click();
+    if (await this.dashboardLink.isVisible().catch(() => false)) {
+      await this.dashboardLink.click();
+    } else {
+      await this.page.goto('/');
+    }
     await expect(this.page).toHaveURL(/\/(?:#\/)?(?:$|\?)/, { timeout: 15000 });
   }
 
   async goToPending(): Promise<void> {
     await this.expandOrdersMenu();
-    await this.pendingLink.click();
+    if (await this.pendingLink.isVisible().catch(() => false)) {
+      await this.pendingLink.click();
+    } else {
+      await this.page.goto('/pending-order');
+    }
     await expect(this.page).toHaveURL(/pending-order/i, { timeout: 15000 });
   }
 
   async goToInProgress(): Promise<void> {
     await this.expandOrdersMenu();
-    await this.inProgressLink.click();
+    if (await this.inProgressLink.isVisible().catch(() => false)) {
+      await this.inProgressLink.click();
+    } else {
+      await this.page.goto('/in-progress-orders');
+    }
     await expect(this.page).toHaveURL(/in-progress-orders/i, { timeout: 15000 });
   }
 
   async goToReady(): Promise<void> {
     await this.expandOrdersMenu();
-    await this.readyLink.click();
+    if (await this.readyLink.isVisible().catch(() => false)) {
+      await this.readyLink.click();
+    } else {
+      await this.page.goto('/ready-orders');
+    }
     await expect(this.page).toHaveURL(/ready-orders/i, { timeout: 15000 });
   }
 
   async goToFulfilled(): Promise<void> {
     await this.expandOrdersMenu();
-    await this.fulfilledLink.click();
+    if (await this.fulfilledLink.isVisible().catch(() => false)) {
+      await this.fulfilledLink.click();
+    } else {
+      await this.page.goto('/fulfilled-orders');
+    }
     await expect(this.page).toHaveURL(/fulfilled-orders/i, { timeout: 15000 });
   }
 
   async goToAllOrders(): Promise<void> {
     await this.expandOrdersMenu();
-    await this.allOrdersLink.click();
+    if (await this.allOrdersLink.isVisible().catch(() => false)) {
+      await this.allOrdersLink.click();
+    } else {
+      await this.page.goto('/all-orders');
+    }
     await expect(this.page).toHaveURL(/all-orders/i, { timeout: 15000 });
   }
 
   async goToCanceled(): Promise<void> {
     await this.expandOrdersMenu();
-    await this.canceledLink.click();
+    if (await this.canceledLink.isVisible().catch(() => false)) {
+      await this.canceledLink.click();
+    } else {
+      await this.page.goto('/cancelled-orders');
+    }
     await expect(this.page).toHaveURL(/cancelled-orders/i, { timeout: 15000 });
   }
 

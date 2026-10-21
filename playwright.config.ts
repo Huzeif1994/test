@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config } from './config/environment';
 
+const isHeaded = process.argv.includes('--headed');
+
+const desktopChrome = {
+  ...devices['Desktop Chrome'],
+  viewport: isHeaded ? null : { width: 1920, height: 1080 },
+  deviceScaleFactor: isHeaded ? undefined : 1,
+};
+
 export default defineConfig({
   testDir: './tests',
 
@@ -40,30 +48,47 @@ export default defineConfig({
 
   projects: [
     {
+      name: 'setup-fulfillment',
+      testMatch: /auth\.fulfillment\.setup\.ts/,
+      use: {
+        ...desktopChrome,
+        baseURL: config.fulfillment.baseUrl,
+      },
+    },
+    {
+      name: 'setup-admin',
+      testMatch: /auth\.admin\.setup\.ts/,
+      use: {
+        ...desktopChrome,
+        baseURL: config.admin.baseUrl,
+      },
+    },
+    {
       name: 'ordering',
       testDir: './tests/ordering',
       use: {
-        ...devices['Desktop Chrome'],
-        viewport: null,
+        ...desktopChrome,
         baseURL: config.ordering.baseUrl,
       },
     },
     {
       name: 'admin',
       testDir: './tests/admin',
+      dependencies: ['setup-admin'],
       use: {
-        ...devices['Desktop Chrome'],
-        viewport: null,
+        ...desktopChrome,
         baseURL: config.admin.baseUrl,
+        storageState: '.auth/admin.json',
       },
     },
     {
       name: 'fulfillment',
       testDir: './tests/fulfillment',
+      dependencies: ['setup-fulfillment'],
       use: {
-        ...devices['Desktop Chrome'],
-        viewport: null,
+        ...desktopChrome,
         baseURL: config.fulfillment.baseUrl,
+        storageState: '.auth/fulfillment.json',
       },
     },
   ],

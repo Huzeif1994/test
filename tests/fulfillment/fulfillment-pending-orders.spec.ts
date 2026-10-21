@@ -14,9 +14,8 @@ test.describe('Fulfillment Pending Orders & Order Picking Workflow Suite', () =>
     await allure.story('Controls, Search, Pagination, Action Menu & Order Details Inspection');
     await allure.severity('critical');
 
-    await test.step('Authenticate via Identity Server and verify Dashboard landing', async () => {
-      await fulfillmentLoginPage.goto();
-      await fulfillmentLoginPage.login();
+    await test.step('Verify Dashboard landing using saved authenticated session', async () => {
+      await page.goto('/');
       await fulfillmentLoginPage.expectLoggedIn();
     });
 
@@ -97,12 +96,8 @@ test.describe('Fulfillment Pending Orders & Order Picking Workflow Suite', () =>
     await allure.story('End-to-End Pick Order to Staging and Mark Ready Workflow');
     await allure.severity('blocker');
 
-    await test.step('Authenticate via Identity Server and navigate to Pending Orders', async () => {
-      await fulfillmentLoginPage.goto();
-      await fulfillmentLoginPage.login();
-      await fulfillmentLoginPage.expectLoggedIn();
-
-      await fulfillmentSidebar.goToPending();
+    await test.step('Verify authenticated session and navigate to Pending Orders', async () => {
+      await page.goto('/pending-order');
       await pendingOrdersPage.expectOnPendingPage();
       await pendingOrdersPage.expectTableLoaded();
     });

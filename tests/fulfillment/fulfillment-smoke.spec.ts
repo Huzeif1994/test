@@ -14,9 +14,8 @@ test.describe('Fulfillment App Smoke Suite', () => {
     await allure.story('Sidebar Navigation & Order Tables Health Check');
     await allure.severity('critical');
 
-    await test.step('Authenticate via Identity Server and verify Dashboard landing', async () => {
-      await fulfillmentLoginPage.goto();
-      await fulfillmentLoginPage.login();
+    await test.step('Verify Dashboard landing using saved authenticated session', async () => {
+      await page.goto('/');
       await fulfillmentLoginPage.expectLoggedIn();
     });
 

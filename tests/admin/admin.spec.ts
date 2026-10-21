@@ -1,6 +1,9 @@
 import { allure } from 'allure-playwright';
 import { test } from '../../fixtures/pages';
 
+// Login flow test requires fresh, unauthenticated session
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Admin Portal', () => {
   test('admin user logs in via Identity Server and redirects to dashboard', async ({ adminLoginPage }) => {
     await allure.epic('Admin Portal');
