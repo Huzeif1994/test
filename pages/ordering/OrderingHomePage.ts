@@ -23,7 +23,7 @@ export class OrderingHomePage extends BasePage {
     this.ageVerificationButton = page.getByRole('button', { name: /^Skip$/i }).or(page.locator('button').filter({ hasText: /^Skip$/i })).or(page.locator('button:has-text("21+"), button:has-text("I\'m 21+")')).first();
 
     // Storefront Navigation
-    this.headerSignInButton = page.locator('.account-notifaction, header button:has-text("Sign In"), header button:has-text("Sign In Account")').first();
+    this.headerSignInButton = page.locator('header button:has-text("Sign In"), header button:has-text("Sign In Account"), .account-notifaction').first();
     this.drawerSignInButton = page.locator('.q-drawer button, aside button, .q-drawer a, aside a').filter({ hasText: /^Sign In$/i }).first().or(page.locator('button, a').filter({ hasText: /^Sign In$/i }).last());
 
     // Identity Server Login Form
@@ -110,6 +110,18 @@ export class OrderingHomePage extends BasePage {
   async login(user: string = config.ordering.user, password?: string): Promise<void> {
     const pass = password || config.ordering.password || '';
 
+    // If already logged in on storefront, skip redundant login
+    const isAlreadyLoggedIn = await this.page.locator('header')
+      .filter({ hasText: /Logout|Log Out|Hi,|My Account/i })
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+
+    if (isAlreadyLoggedIn) {
+      console.log('Customer is already logged in on storefront.');
+      return;
+    }
+
     // 1. Open drawer (resilient against popups and backdrops)
     let drawerOpened = false;
     for (let attempt = 1; attempt <= 6; attempt++) {
@@ -120,6 +132,17 @@ export class OrderingHomePage extends BasePage {
       if (await this.drawerSignInButton.isVisible().catch(() => false)) {
         drawerOpened = true;
         break;
+      }
+
+      // Check if drawer opened to account menu (already logged in)
+      const isDrawerAccount = await this.page.locator('.q-drawer, aside')
+        .filter({ hasText: /Logout|Log Out|My Profile|My Orders/i })
+        .first()
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      if (isDrawerAccount) {
+        console.log('Customer account drawer detected (already logged in).');
+        return;
       }
 
       // Ensure header button is visible and try clicking
@@ -135,6 +158,17 @@ export class OrderingHomePage extends BasePage {
       if (await this.drawerSignInButton.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false)) {
         drawerOpened = true;
         break;
+      }
+
+      // Check again if drawer opened to account menu
+      const isAccountDrawerAfterClick = await this.page.locator('.q-drawer, aside')
+        .filter({ hasText: /Logout|Log Out|My Profile|My Orders/i })
+        .first()
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      if (isAccountDrawerAfterClick) {
+        console.log('Customer account drawer detected (already logged in).');
+        return;
       }
 
       await this.page.waitForTimeout(1000);

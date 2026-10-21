@@ -1,6 +1,9 @@
 import { allure } from 'allure-playwright';
 import { test } from '../../fixtures/pages';
 
+// Login flow test requires fresh, unauthenticated session
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Online Ordering App', () => {
   test('user visits storefront, handles popups, and logs in via Identity Server', async ({ orderingHomePage }) => {
     await allure.epic('Online Ordering');
