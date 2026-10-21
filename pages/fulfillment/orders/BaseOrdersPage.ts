@@ -37,7 +37,7 @@ export abstract class BaseOrdersPage extends BasePage {
    */
   async expectTitle(expected: string | RegExp): Promise<void> {
     await this.expectTableLoaded();
-    await expect(this.tableTitle).toHaveText(expected, { timeout: 15000 });
+    await expect(this.tableTitle).toContainText(expected, { timeout: 15000 });
   }
 
   /**

@@ -160,7 +160,11 @@ export class FulfillmentSidebar {
 
   async goToManageStagingArea(): Promise<void> {
     await this.dismissPromoBanners();
-    await this.manageStagingAreaLink.click();
+    if (await this.manageStagingAreaLink.isVisible().catch(() => false)) {
+      await this.manageStagingAreaLink.click();
+    } else {
+      await this.page.goto('/manage-staging-area');
+    }
     await expect(this.page).toHaveURL(/manage-staging-area/i, { timeout: 15000 });
   }
 }

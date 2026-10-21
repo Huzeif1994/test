@@ -6,6 +6,10 @@ import { FulfillmentLoginPage } from '../pages/fulfillment/FulfillmentLoginPage'
 import { FulfillmentSidebar } from '../pages/fulfillment/navigation/FulfillmentSidebar';
 import { PendingOrdersPage } from '../pages/fulfillment/orders/PendingOrdersPage';
 import { ReadyOrdersPage } from '../pages/fulfillment/orders/ReadyOrdersPage';
+import { InProgressOrdersPage } from '../pages/fulfillment/orders/InProgressOrdersPage';
+import { FulfilledOrdersPage } from '../pages/fulfillment/orders/FulfilledOrdersPage';
+import { AllOrdersPage } from '../pages/fulfillment/orders/AllOrdersPage';
+import { ManageStagingAreaPage } from '../pages/fulfillment/staging/ManageStagingAreaPage';
 import { StorePickupDetailPage } from '../pages/fulfillment/detail/StorePickupDetailPage';
 import { VerifyAgeModal } from '../pages/fulfillment/modals/VerifyAgeModal';
 import { OrderDetailPage } from '../pages/fulfillment/orders/OrderDetailPage';
@@ -33,6 +37,10 @@ type Pages = {
   fulfillmentSidebar: FulfillmentSidebar;
   pendingOrdersPage: PendingOrdersPage;
   readyOrdersPage: ReadyOrdersPage;
+  inProgressOrdersPage: InProgressOrdersPage;
+  fulfilledOrdersPage: FulfilledOrdersPage;
+  allOrdersPage: AllOrdersPage;
+  manageStagingAreaPage: ManageStagingAreaPage;
   storePickupDetailPage: StorePickupDetailPage;
   verifyAgeModal: VerifyAgeModal;
   orderDetailPage: OrderDetailPage;
@@ -73,6 +81,18 @@ export const test = base.extend<Pages>({
   },
   readyOrdersPage: async ({ page }, use) => {
     await use(new ReadyOrdersPage(page));
+  },
+  inProgressOrdersPage: async ({ page }, use) => {
+    await use(new InProgressOrdersPage(page));
+  },
+  fulfilledOrdersPage: async ({ page }, use) => {
+    await use(new FulfilledOrdersPage(page));
+  },
+  allOrdersPage: async ({ page }, use) => {
+    await use(new AllOrdersPage(page));
+  },
+  manageStagingAreaPage: async ({ page }, use) => {
+    await use(new ManageStagingAreaPage(page));
   },
   storePickupDetailPage: async ({ page }, use) => {
     await use(new StorePickupDetailPage(page));
