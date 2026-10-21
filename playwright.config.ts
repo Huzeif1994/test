@@ -101,5 +101,13 @@ export default defineConfig({
         storageState: '.auth/fulfillment.json',
       },
     },
+    {
+      name: 'e2e-bridge',
+      testDir: './tests/e2e-bridge',
+      dependencies: ['setup-ordering', 'setup-fulfillment'],
+      use: {
+        ...desktopChrome,
+      },
+    },
   ],
 });

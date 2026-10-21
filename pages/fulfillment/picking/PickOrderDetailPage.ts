@@ -85,16 +85,16 @@ export class PickOrderDetailPage extends BasePage {
         await this.page.waitForTimeout(500);
       }
 
-      // Check for Linked Products
-      const linkedTitle = row.locator('.linked-product__title, text="Linked Product"').first();
-      if (await linkedTitle.isVisible().catch(() => false)) {
-        await linkedTitle.click();
+      // Check for Linked Products button / pill
+      const linkedBtn = row.locator('button, .q-btn, a, div').filter({ hasText: /Linked Product/i }).first();
+      if (await linkedBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+        await linkedBtn.click();
         await this.page.waitForTimeout(500);
-        const linkedRows = row.locator('.linked-product__row');
+        const linkedRows = this.page.locator('.linked-product__row, tr.linked, .linked-item');
         const linkedCount = await linkedRows.count();
         for (let j = 0; j < linkedCount; j++) {
           const linkedRow = linkedRows.nth(j);
-          const isLinkedPicked = await linkedRow.locator('.q-badge:has-text("Picked")').isVisible().catch(() => false);
+          const isLinkedPicked = await linkedRow.locator('.q-badge:has-text("Picked"), [class*="picked"]').isVisible().catch(() => false);
           if (!isLinkedPicked) {
             await linkedRow.click();
             await itemInfoDrawer.expectDrawerOpen();

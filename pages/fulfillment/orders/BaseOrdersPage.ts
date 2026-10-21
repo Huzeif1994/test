@@ -46,6 +46,7 @@ export abstract class BaseOrdersPage extends BasePage {
   async search(query: string): Promise<void> {
     await this.searchInput.waitFor({ state: 'visible', timeout: 15000 });
     await this.searchInput.fill(query);
+    await this.searchInput.press('Enter');
     await this.expectTableLoaded();
     await this.page.waitForTimeout(1000);
   }
