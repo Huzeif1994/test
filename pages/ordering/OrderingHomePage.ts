@@ -23,8 +23,8 @@ export class OrderingHomePage extends BasePage {
     this.ageVerificationButton = page.getByRole('button', { name: /^Skip$/i }).or(page.locator('button').filter({ hasText: /^Skip$/i })).or(page.locator('button:has-text("21+"), button:has-text("I\'m 21+")')).first();
 
     // Storefront Navigation
-    this.headerSignInButton = page.locator('header button:has-text("Sign In"), header button:has-text("Sign In Account"), .account-notifaction').first();
-    this.drawerSignInButton = page.locator('.q-drawer button, aside button, .q-drawer a, aside a').filter({ hasText: /^Sign In$/i }).first().or(page.locator('button, a').filter({ hasText: /^Sign In$/i }).last());
+    this.headerSignInButton = page.locator('.account-notifaction').or(page.getByRole('button', { name: /Sign In/i })).or(page.locator('button:has-text("Sign In Account")')).first();
+    this.drawerSignInButton = page.locator('.q-drawer, aside, .q-menu').locator('button, a').filter({ hasText: /^Sign In$/i }).first().or(page.locator('button, a').filter({ hasText: /^Sign In$/i }).last());
 
     // Identity Server Login Form
     this.useEmailLink = page.locator('#lnkShowLoginByEmail, text="Use Email Instead"').first();
@@ -121,6 +121,10 @@ export class OrderingHomePage extends BasePage {
       console.log('Customer is already logged in on storefront.');
       return;
     }
+
+    // Wait for storefront loading skeletons to detach so Vue components hydrate
+    await this.page.locator('.q-skeleton').first().waitFor({ state: 'detached', timeout: 25000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
 
     // 1. Open drawer (resilient against popups and backdrops)
     let drawerOpened = false;

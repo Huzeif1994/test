@@ -76,33 +76,55 @@ export class PickOrderDetailPage extends BasePage {
 
     for (let i = 0; i < count; i++) {
       const row = mainRows.nth(i);
-      const isPicked = await row.locator('.q-badge:has-text("Picked")').isVisible().catch(() => false);
+      
+      // 1. Pick Main Product if not picked
+      const isPicked = await row.locator('.q-badge:has-text("Picked"), [class*="picked"]').first().isVisible().catch(() => false);
       if (!isPicked) {
-        await row.click();
+        const titleCell = row.locator('.ftx-table__td__title, .ftx-table__td.w-40, .ftx-table__td').first();
+        await titleCell.click();
         await itemInfoDrawer.expectDrawerOpen();
         await itemInfoDrawer.selectPickedQty();
         await itemInfoDrawer.clickDone();
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(600);
       }
 
-      // Check for Linked Products button / pill
-      const linkedBtn = row.locator('button, .q-btn, a, div').filter({ hasText: /Linked Product/i }).first();
-      if (await linkedBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
-        await linkedBtn.click();
-        await this.page.waitForTimeout(500);
-        const linkedRows = this.page.locator('.linked-product__row, tr.linked, .linked-item');
-        const linkedCount = await linkedRows.count();
-        for (let j = 0; j < linkedCount; j++) {
-          const linkedRow = linkedRows.nth(j);
-          const isLinkedPicked = await linkedRow.locator('.q-badge:has-text("Picked"), [class*="picked"]').isVisible().catch(() => false);
-          if (!isLinkedPicked) {
-            await linkedRow.click();
-            await itemInfoDrawer.expectDrawerOpen();
-            await itemInfoDrawer.selectPickedQty();
-            await itemInfoDrawer.clickDone();
-            await this.page.waitForTimeout(500);
-          }
+      // 2. Expand Linked Product section if collapsed
+      const linkedBtn = row.locator('.linked-product__title, button, .q-btn').filter({ hasText: /Linked Product/i }).first();
+      if (await linkedBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await linkedBtn.click().catch(() => {});
+        await this.page.waitForTimeout(400);
+      }
+
+      // 3. Pick any Linked Product rows inside this row
+      const linkedRows = row.locator('.linked-product__row');
+      const linkedCount = await linkedRows.count();
+      for (let j = 0; j < linkedCount; j++) {
+        const linkedRow = linkedRows.nth(j);
+        const isLinkedPicked = await linkedRow.locator('.q-badge:has-text("Picked"), [class*="picked"]').first().isVisible().catch(() => false);
+        if (!isLinkedPicked) {
+          const linkedCell = linkedRow.locator('.ftx-table__td.w-40, span.text-dark, .ftx-table__td').first();
+          await linkedCell.click();
+          await itemInfoDrawer.expectDrawerOpen();
+          await itemInfoDrawer.selectPickedQty();
+          await itemInfoDrawer.clickDone();
+          await this.page.waitForTimeout(600);
         }
+      }
+    }
+
+    // Safety sweep: Check all linked products on the page
+    const allLinkedRows = this.page.locator('.linked-product__row');
+    const totalLinked = await allLinkedRows.count();
+    for (let k = 0; k < totalLinked; k++) {
+      const linkedRow = allLinkedRows.nth(k);
+      const isLinkedPicked = await linkedRow.locator('.q-badge:has-text("Picked"), [class*="picked"]').first().isVisible().catch(() => false);
+      if (!isLinkedPicked) {
+        const linkedCell = linkedRow.locator('.ftx-table__td.w-40, span.text-dark, .ftx-table__td').first();
+        await linkedCell.click();
+        await itemInfoDrawer.expectDrawerOpen();
+        await itemInfoDrawer.selectPickedQty();
+        await itemInfoDrawer.clickDone();
+        await this.page.waitForTimeout(600);
       }
     }
   }

@@ -4,6 +4,8 @@ import { config } from '../../config/environment';
 import { OrderingCatalogPage } from '../../pages/ordering/OrderingCatalogPage';
 import { OrderingCheckoutPage } from '../../pages/ordering/OrderingCheckoutPage';
 import { PendingOrdersPage } from '../../pages/fulfillment/orders/PendingOrdersPage';
+import { ReadyOrdersPage } from '../../pages/fulfillment/orders/ReadyOrdersPage';
+import { FulfillmentSidebar } from '../../pages/fulfillment/navigation/FulfillmentSidebar';
 import { OrderDetailPage } from '../../pages/fulfillment/orders/OrderDetailPage';
 import { PickOrderDetailPage } from '../../pages/fulfillment/picking/PickOrderDetailPage';
 import { ItemInfoDrawer } from '../../pages/fulfillment/modals/ItemInfoDrawer';
@@ -15,7 +17,7 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
   test('Complete Customer Order placement bridged to Fulfillment Picking and Staging @bridge @e2e', async ({
     browser,
   }) => {
-    test.setTimeout(240_000); // 4 minutes for multi-app end-to-end flow
+    test.setTimeout(300_000); // 5 minutes for multi-app end-to-end flow
 
     await allure.epic('Cross-App E2E Integration');
     await allure.feature('Online Ordering Storefront to Fulfillment App Bridge');
@@ -28,6 +30,7 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
     const customerContext = await browser.newContext({
       storageState: '.auth/ordering.json',
       baseURL: config.ordering.baseUrl,
+      viewport: { width: 1920, height: 1080 },
     });
     const customerPage = await customerContext.newPage();
     const catalogPage = new OrderingCatalogPage(customerPage);
@@ -35,9 +38,10 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
 
     let placedOrderNumber = '';
 
-    await test.step('Customer browses catalog, adds product to cart, and proceeds to checkout', async () => {
+    await test.step('Customer clears cart, browses category, adds CASA TURRENT SERIE 1973 ROBUSTO, and proceeds to checkout', async () => {
+      await checkoutPage.clearCartIfNotEmpty();
       await catalogPage.gotoCategory('huzeif-test');
-      await catalogPage.addProductToCart();
+      await catalogPage.addProductToCart('CASA TURRENT SERIE 1973 ROBUSTO');
       await catalogPage.openCartAndProceed();
       await checkoutPage.proceedToCheckout();
     });
@@ -60,6 +64,7 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
     const fulfillmentContext = await browser.newContext({
       storageState: '.auth/fulfillment.json',
       baseURL: config.fulfillment.baseUrl,
+      viewport: { width: 1920, height: 1080 },
     });
     const fulfillmentPage = await fulfillmentContext.newPage();
     const pendingOrdersPage = new PendingOrdersPage(fulfillmentPage);
@@ -142,7 +147,34 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
     }
 
     // ─────────────────────────────────────────────────────────────
-    // STEP 3: Cleanup & Status Verification
+    // STEP 3: Ready Orders Listing & Payment Method Card Verification
+    // ─────────────────────────────────────────────────────────────
+    const readyOrdersPage = new ReadyOrdersPage(fulfillmentPage);
+    const fulfillmentSidebar = new FulfillmentSidebar(fulfillmentPage);
+
+    await test.step('Navigate to Ready Orders listing and verify YES, Payment Due', async () => {
+      await fulfillmentSidebar.goToReady();
+      await readyOrdersPage.expectOnReadyPage();
+      await readyOrdersPage.expectTableLoaded();
+
+      if (searchKeyword) {
+        await readyOrdersPage.search(searchKeyword);
+        await readyOrdersPage.expectTableLoaded();
+        await readyOrdersPage.expectPaymentDue(searchKeyword);
+      }
+    });
+
+    await test.step('Open Order Detail from Ready Orders and verify Pay At Store in Payment Method card', async () => {
+      if (searchKeyword) {
+        await readyOrdersPage.openOrderForHandover(searchKeyword);
+      } else {
+        await readyOrdersPage.openOrderForHandover();
+      }
+      await readyOrdersPage.verifyPayAtStorePaymentMethod();
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 4: Cleanup & Customer Status Verification
     // ─────────────────────────────────────────────────────────────
     await test.step('Customer refreshes Orders history and confirms order was processed', async () => {
       await customerPage.goto('/orders', { waitUntil: 'domcontentloaded' });

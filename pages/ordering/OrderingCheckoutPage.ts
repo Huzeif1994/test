@@ -44,6 +44,35 @@ export class OrderingCheckoutPage extends BasePage {
   }
 
   /**
+   * Clear any existing items in the cart to guarantee clean cart state
+   */
+  async clearCartIfNotEmpty(): Promise<void> {
+    await this.gotoCart();
+    await this.page.waitForTimeout(1000);
+
+    const emptyNotice = this.page.locator('text=/your cart is empty/i, text=/no items in cart/i').first();
+    if (await emptyNotice.isVisible({ timeout: 1500 }).catch(() => false)) {
+      return;
+    }
+
+    const clearBtn = this.page.locator('button, a').filter({ hasText: /Clear Cart|Remove All/i }).first();
+    if (await clearBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await clearBtn.click();
+      await this.page.locator('.q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm"), .q-dialog button:has-text("OK")').first().click({ timeout: 2000 }).catch(() => {});
+      await this.page.waitForTimeout(1000);
+      return;
+    }
+
+    const deleteButtons = this.page.locator('button:has(.q-icon:has-text("delete")), button i:has-text("delete"), .q-btn [class*="delete"], button:has-text("Remove"), .delete-btn');
+    let count = await deleteButtons.count();
+    for (let i = 0; i < count; i++) {
+      await deleteButtons.first().click().catch(() => {});
+      await this.page.locator('.q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm"), .q-dialog button:has-text("OK")').first().click({ timeout: 1500 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
    * Click "Proceed to Checkout" on the Cart page
    */
   async proceedToCheckout(): Promise<void> {
