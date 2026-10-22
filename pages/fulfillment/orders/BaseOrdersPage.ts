@@ -46,7 +46,16 @@ export abstract class BaseOrdersPage extends BasePage {
   async search(query: string): Promise<void> {
     await this.searchInput.waitFor({ state: 'visible', timeout: 15000 });
     await this.searchInput.fill(query);
-    await this.searchInput.press('Enter');
+
+    // Wait for the filtered Orders API response or timeout gracefully
+    await Promise.all([
+      this.page.waitForResponse(
+        res => res.url().includes('Orders') && res.url().includes(encodeURIComponent(query)),
+        { timeout: 15000 }
+      ).catch(() => null),
+      this.searchInput.press('Enter'),
+    ]);
+
     await this.expectTableLoaded();
     await this.page.waitForTimeout(1000);
   }
@@ -89,7 +98,15 @@ export abstract class BaseOrdersPage extends BasePage {
   async clickOrderRow(orderNumber: string): Promise<void> {
     await this.expectTableLoaded();
     await this.dismissPromoBanners();
-    const row = this.tableRows.filter({ hasText: orderNumber }).first();
+
+    let row = this.tableRows.filter({ hasText: orderNumber }).first();
+    // If not visible (e.g. initial table response raced and overwrote), re-trigger search
+    if (!(await row.isVisible({ timeout: 2000 }).catch(() => false))) {
+      console.log(`Order ${orderNumber} not visible in table, re-triggering search...`);
+      await this.search(orderNumber);
+      row = this.tableRows.filter({ hasText: orderNumber }).first();
+    }
+
     await row.waitFor({ state: 'visible', timeout: 15000 });
     await row.scrollIntoViewIfNeeded().catch(() => {});
     await row.click();

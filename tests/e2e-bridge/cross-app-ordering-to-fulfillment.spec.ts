@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { allure } from 'allure-playwright';
 import { config } from '../../config/environment';
+import { maximizeWindow } from '../../utils/window';
 import { OrderingCatalogPage } from '../../pages/ordering/OrderingCatalogPage';
 import { OrderingCheckoutPage } from '../../pages/ordering/OrderingCheckoutPage';
 import { PendingOrdersPage } from '../../pages/fulfillment/orders/PendingOrdersPage';
@@ -24,15 +25,19 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
     await allure.story('Customer places Store Pickup order -> Fulfillment staff picks and marks Ready');
     await allure.severity('blocker');
 
+    const isHeaded = process.argv.some(arg => arg.includes('--headed') || arg.includes('--ui') || arg === '-h') || process.env.HEADED === 'true';
+    const desktopViewport = isHeaded ? null : { width: 1366, height: 768 };
+
     // ─────────────────────────────────────────────────────────────
     // STEP 1: Customer Storefront Session (Online Ordering)
     // ─────────────────────────────────────────────────────────────
     const customerContext = await browser.newContext({
       storageState: '.auth/ordering.json',
       baseURL: config.ordering.baseUrl,
-      viewport: { width: 1920, height: 1080 },
+      viewport: desktopViewport,
     });
     const customerPage = await customerContext.newPage();
+    await maximizeWindow(customerPage);
     const catalogPage = new OrderingCatalogPage(customerPage);
     const checkoutPage = new OrderingCheckoutPage(customerPage);
 
@@ -64,9 +69,10 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
     const fulfillmentContext = await browser.newContext({
       storageState: '.auth/fulfillment.json',
       baseURL: config.fulfillment.baseUrl,
-      viewport: { width: 1920, height: 1080 },
+      viewport: desktopViewport,
     });
     const fulfillmentPage = await fulfillmentContext.newPage();
+    await maximizeWindow(fulfillmentPage);
     const pendingOrdersPage = new PendingOrdersPage(fulfillmentPage);
     const orderDetailPage = new OrderDetailPage(fulfillmentPage);
     const pickOrderDetailPage = new PickOrderDetailPage(fulfillmentPage);
@@ -82,11 +88,27 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
       await pendingOrdersPage.expectTableLoaded();
 
       if (placedOrderNumber) {
-        // Strip suffix if present (e.g., 03065381372_37386 -> 03065381372)
-        searchKeyword = placedOrderNumber.split('_')[0];
-        console.log('Fulfillment searching for order keyword:', searchKeyword);
-        await pendingOrdersPage.search(searchKeyword);
-        await pendingOrdersPage.expectTableLoaded();
+        // Search exact entire order number so we do not pick any other order
+        searchKeyword = placedOrderNumber;
+        console.log('Fulfillment searching for exact order number:', searchKeyword);
+        for (let attempt = 0; attempt < 8; attempt++) {
+          await pendingOrdersPage.search(searchKeyword);
+          await pendingOrdersPage.expectTableLoaded();
+          const targetRow = fulfillmentPage.locator('.q-table tbody tr, tr.cursor-pointer').filter({ hasText: searchKeyword }).first();
+          if (await targetRow.isVisible({ timeout: 2000 }).catch(() => false)) {
+            console.log(`Bridge Test: Target order found: ${searchKeyword}`);
+            break;
+          }
+          console.log(`Bridge Test: Order not visible yet in table, refreshing in 3s (attempt ${attempt + 1}/8)...`);
+          const refreshBtn = fulfillmentPage.locator('button').filter({ has: fulfillmentPage.locator('i:has-text("refresh"), .q-icon:has-text("refresh")') }).first();
+          if (await refreshBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await refreshBtn.click();
+          } else {
+            await fulfillmentPage.reload({ waitUntil: 'domcontentloaded' });
+          }
+          await pendingOrdersPage.expectTableLoaded();
+          await fulfillmentPage.waitForTimeout(3000);
+        }
       }
     });
 
@@ -94,8 +116,8 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
 
     if (pendingCount > 0) {
       await test.step('Open Order Detail and initiate Start Picking', async () => {
-        // Open the matching searched order or the first order
-        if (searchKeyword && await fulfillmentPage.locator('.ftx-table__body').filter({ hasText: searchKeyword }).first().isVisible().catch(() => false)) {
+        // Open the matching searched order
+        if (searchKeyword) {
           await pendingOrdersPage.openOrderDetail(searchKeyword);
         } else {
           await pendingOrdersPage.openOrderDetail();
@@ -166,9 +188,9 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
 
     await test.step('Open Order Detail from Ready Orders and verify Pay At Store in Payment Method card', async () => {
       if (searchKeyword) {
-        await readyOrdersPage.openOrderForHandover(searchKeyword);
+        await readyOrdersPage.openOrderDetail(searchKeyword);
       } else {
-        await readyOrdersPage.openOrderForHandover();
+        await readyOrdersPage.openOrderDetail();
       }
       await readyOrdersPage.verifyPayAtStorePaymentMethod();
     });

@@ -1,4 +1,5 @@
 import { test as base } from '@playwright/test';
+import { maximizeWindow } from '../utils/window';
 import { HomePage } from '../pages/HomePage';
 import { OrderingHomePage } from '../pages/ordering/OrderingHomePage';
 import { AdminLoginPage } from '../pages/admin/AdminLoginPage';
@@ -52,6 +53,10 @@ type Pages = {
 };
 
 export const test = base.extend<Pages>({
+  page: async ({ page }, use) => {
+    await maximizeWindow(page);
+    await use(page);
+  },
   homePage: async ({ page }, use) => {
     await use(new HomePage(page));
   },

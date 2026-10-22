@@ -1,12 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config } from './config/environment';
 
-const isHeaded = process.argv.includes('--headed');
+const isHeaded = process.argv.some(arg => arg.includes('--headed') || arg.includes('--ui') || arg === '-h') || process.env.HEADED === 'true';
+
+if (isHeaded) {
+  process.env.HEADED = 'true';
+}
 
 const desktopChrome = {
-  ...devices['Desktop Chrome'],
-  viewport: isHeaded ? null : { width: 1920, height: 1080 },
-  deviceScaleFactor: isHeaded ? undefined : 1,
+  viewport: null,
 };
 
 export default defineConfig({
@@ -35,10 +37,14 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 20_000,
 
-    /* Maximize browser screen */
+    /* Always use viewport: null so the browser window expands naturally without forced emulation borders */
     viewport: null,
     launchOptions: {
-      args: ['--start-maximized'],
+      args: [
+        '--start-maximized',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+      ],
     },
 
     trace: 'on-first-retry',

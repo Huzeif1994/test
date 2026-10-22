@@ -122,8 +122,8 @@ export class OrderingHomePage extends BasePage {
       return;
     }
 
-    // Wait for storefront loading skeletons to detach so Vue components hydrate
-    await this.page.locator('.q-skeleton').first().waitFor({ state: 'detached', timeout: 25000 }).catch(() => {});
+    // Wait for storefront loading skeletons to hide so Vue components hydrate
+    await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
 
     // 1. Open drawer (resilient against popups and backdrops)
@@ -181,7 +181,9 @@ export class OrderingHomePage extends BasePage {
     if (!drawerOpened) {
       // Final attempt: force click header sign in
       await this.dismissAllPopups(3000);
-      await this.headerSignInButton.click({ force: true });
+      if (await this.headerSignInButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await this.headerSignInButton.click({ force: true });
+      }
       await this.drawerSignInButton.waitFor({ state: 'visible', timeout: 15000 });
     }
 

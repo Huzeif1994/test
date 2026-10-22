@@ -114,20 +114,28 @@ export class FulfillmentSidebar {
 
   async goToReady(): Promise<void> {
     await this.expandOrdersMenu();
-    if (await this.readyLink.isVisible().catch(() => false)) {
-      await this.readyLink.click();
-    } else {
-      await this.page.goto('/ready-orders');
+    try {
+      if (await this.readyLink.isVisible().catch(() => false)) {
+        await this.readyLink.click({ timeout: 5000 });
+      } else {
+        await this.page.goto('/ready-orders', { waitUntil: 'domcontentloaded' });
+      }
+    } catch {
+      await this.page.goto('/ready-orders', { waitUntil: 'domcontentloaded' });
     }
     await expect(this.page).toHaveURL(/ready-orders/i, { timeout: 15000 });
   }
 
   async goToFulfilled(): Promise<void> {
     await this.expandOrdersMenu();
-    if (await this.fulfilledLink.isVisible().catch(() => false)) {
-      await this.fulfilledLink.click();
-    } else {
-      await this.page.goto('/fulfilled-orders');
+    try {
+      if (await this.fulfilledLink.isVisible().catch(() => false)) {
+        await this.fulfilledLink.click({ timeout: 5000 });
+      } else {
+        await this.page.goto('/fulfilled-orders', { waitUntil: 'domcontentloaded' });
+      }
+    } catch {
+      await this.page.goto('/fulfilled-orders', { waitUntil: 'domcontentloaded' });
     }
     await expect(this.page).toHaveURL(/fulfilled-orders/i, { timeout: 15000 });
   }
