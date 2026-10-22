@@ -28,6 +28,7 @@ export class PendingOrdersPage extends BaseOrdersPage {
   async expectOnPendingPage(): Promise<void> {
     await expect(this.page).toHaveURL(/pending-order/i, { timeout: 15000 });
     await this.expectTitle(/Pending Orders/i);
+    await this.waitForInitialData();
   }
 
   /**

@@ -94,7 +94,7 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
         for (let attempt = 0; attempt < 8; attempt++) {
           await pendingOrdersPage.search(searchKeyword);
           await pendingOrdersPage.expectTableLoaded();
-          const targetRow = fulfillmentPage.locator('.q-table tbody tr, tr.cursor-pointer').filter({ hasText: searchKeyword }).first();
+          const targetRow = fulfillmentPage.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: searchKeyword }).first();
           if (await targetRow.isVisible({ timeout: 2000 }).catch(() => false)) {
             console.log(`Bridge Test: Target order found: ${searchKeyword}`);
             break;

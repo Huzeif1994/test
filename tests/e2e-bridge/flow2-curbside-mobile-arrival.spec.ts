@@ -141,7 +141,7 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
         console.log('Flow 2: Fulfillment searching exact order number:', searchKeyword);
         for (let attempt = 0; attempt < 10; attempt++) {
           await pendingOrdersPage.search(searchKeyword);
-          const targetRow = fulfillmentPage.locator('.q-table tbody tr, tr.cursor-pointer').filter({ hasText: searchKeyword }).first();
+          const targetRow = fulfillmentPage.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: searchKeyword }).first();
           if (await targetRow.isVisible({ timeout: 2000 }).catch(() => false)) {
             console.log(`Flow 2: Target order ${searchKeyword} found on attempt ${attempt + 1}!`);
             break;

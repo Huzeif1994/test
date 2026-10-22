@@ -33,6 +33,18 @@ export abstract class BaseOrdersPage extends BasePage {
   }
 
   /**
+   * Wait for initial table data to finish fetching
+   */
+  async waitForInitialData(timeout: number = 25000): Promise<void> {
+    await this.page.waitForResponse(
+      res => res.url().includes('Orders') && res.status() === 200,
+      { timeout }
+    ).catch(() => {});
+    await this.expectTableLoaded();
+    await this.page.waitForTimeout(800);
+  }
+
+  /**
    * Verifies the table title
    */
   async expectTitle(expected: string | RegExp): Promise<void> {
@@ -45,7 +57,9 @@ export abstract class BaseOrdersPage extends BasePage {
    */
   async search(query: string): Promise<void> {
     await this.searchInput.waitFor({ state: 'visible', timeout: 15000 });
-    await this.searchInput.fill(query);
+    // Clear first to ensure Quasar v-model detects changes
+    await this.searchInput.fill('');
+    await this.page.waitForTimeout(200);
 
     // Wait for the filtered Orders API response or timeout gracefully
     await Promise.all([
@@ -53,7 +67,7 @@ export abstract class BaseOrdersPage extends BasePage {
         res => res.url().includes('Orders') && res.url().includes(encodeURIComponent(query)),
         { timeout: 15000 }
       ).catch(() => null),
-      this.searchInput.press('Enter'),
+      this.searchInput.fill(query).then(() => this.searchInput.press('Enter')),
     ]);
 
     await this.expectTableLoaded();
@@ -103,6 +117,7 @@ export abstract class BaseOrdersPage extends BasePage {
     // If not visible (e.g. initial table response raced and overwrote), re-trigger search
     if (!(await row.isVisible({ timeout: 2000 }).catch(() => false))) {
       console.log(`Order ${orderNumber} not visible in table, re-triggering search...`);
+      await this.clearSearch();
       await this.search(orderNumber);
       row = this.tableRows.filter({ hasText: orderNumber }).first();
     }
