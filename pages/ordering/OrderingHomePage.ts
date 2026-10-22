@@ -149,10 +149,20 @@ export class OrderingHomePage extends BasePage {
         return;
       }
 
-      // Ensure header button is visible and try clicking
+      // Ensure header button or hamburger menu is visible and try clicking
       try {
-        await this.headerSignInButton.waitFor({ state: 'visible', timeout: 10000 });
-        await this.headerSignInButton.click({ timeout: 5000 });
+        if (await this.headerSignInButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await this.headerSignInButton.click({ timeout: 5000 });
+        } else {
+          // Fallback: If responsive hamburger menu is rendered, click it to open drawer
+          const hamburger = this.page.locator('button, .q-btn').filter({ has: this.page.locator('i:has-text("menu"), .q-icon:has-text("menu")') }).first();
+          if (await hamburger.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await hamburger.click({ timeout: 4000 });
+          } else {
+            await this.headerSignInButton.waitFor({ state: 'visible', timeout: 5000 });
+            await this.headerSignInButton.click({ timeout: 5000 });
+          }
+        }
       } catch {
         // If click was intercepted by a backdrop or modal, dismiss popups and retry
         await this.dismissAllPopups(4000);

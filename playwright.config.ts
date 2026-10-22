@@ -8,7 +8,7 @@ if (isHeaded) {
 }
 
 const desktopChrome = {
-  viewport: null,
+  viewport: isHeaded ? null : { width: 1366, height: 768 },
 };
 
 export default defineConfig({
@@ -37,14 +37,12 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 20_000,
 
-    /* Always use viewport: null so the browser window expands naturally without forced emulation borders */
-    viewport: null,
+    /* In headed mode, use null so --start-maximized fits user's screen; in headless/CI, enforce 1366x768 desktop viewport */
+    viewport: isHeaded ? null : { width: 1366, height: 768 },
     launchOptions: {
-      args: [
-        '--start-maximized',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-      ],
+      args: isHeaded
+        ? ['--start-maximized', '--no-sandbox', '--disable-setuid-sandbox']
+        : ['--window-size=1366,768', '--no-sandbox', '--disable-setuid-sandbox'],
     },
 
     trace: 'on-first-retry',
