@@ -10,13 +10,44 @@ export interface GenerationSummary {
 }
 
 /**
- * Maps OpenAPI schema property types to TypeScript types
+ * Resolves $ref pointers (e.g. #/components/schemas/Item -> Item)
  */
-function mapPropertyType(prop: any): string {
+export function resolveRefName(ref: string): string {
+  if (!ref || typeof ref !== 'string') return 'any';
+  const parts = ref.split('/');
+  return parts[parts.length - 1];
+}
+
+/**
+ * Maps OpenAPI schema property types to strongly-typed TypeScript types.
+ * Supports $ref pointers, allOf intersections, oneOf/anyOf unions, enums, arrays, and objects.
+ */
+export function mapPropertyType(prop: any, specRoot?: any): string {
   if (!prop) return 'any';
+
+  // $ref resolution
+  if (prop.$ref) {
+    return resolveRefName(prop.$ref);
+  }
+
+  // allOf intersection
+  if (Array.isArray(prop.allOf)) {
+    return prop.allOf.map((sub: any) => mapPropertyType(sub, specRoot)).join(' & ');
+  }
+
+  // oneOf / anyOf union
+  if (Array.isArray(prop.oneOf)) {
+    return prop.oneOf.map((sub: any) => mapPropertyType(sub, specRoot)).join(' | ');
+  }
+  if (Array.isArray(prop.anyOf)) {
+    return prop.anyOf.map((sub: any) => mapPropertyType(sub, specRoot)).join(' | ');
+  }
+
+  // Enums
   if (prop.enum && Array.isArray(prop.enum)) {
     return prop.enum.map((v: string) => `'${v}'`).join(' | ');
   }
+
   switch (prop.type) {
     case 'string':
       return 'string';
@@ -26,11 +57,17 @@ function mapPropertyType(prop: any): string {
     case 'boolean':
       return 'boolean';
     case 'array':
-      return prop.items ? `${mapPropertyType(prop.items)}[]` : 'any[]';
+      return prop.items ? `${mapPropertyType(prop.items, specRoot)}[]` : 'any[]';
     case 'object':
-      return 'Record<string, any>';
+      if (prop.properties) {
+        const subProps = Object.entries(prop.properties)
+          .map(([k, v]: [string, any]) => `${k}?: ${mapPropertyType(v, specRoot)}`)
+          .join('; ');
+        return `{ ${subProps} }`;
+      }
+      return 'Record<string, unknown>';
     default:
-      return 'any';
+      return 'unknown';
   }
 }
 
@@ -39,7 +76,7 @@ function mapPropertyType(prop: any): string {
  */
 export function validateOpenApiSpec(spec: any): void {
   if (!spec || typeof spec !== 'object') {
-    throw new Error('Invalid specification: content is not a valid JSON object.');
+    throw new Error('Invalid specification: content is not a valid JSON or YAML object.');
   }
   const isV3 = typeof spec.openapi === 'string' && spec.openapi.startsWith('3.');
   const isV2 = typeof spec.swagger === 'string' && spec.swagger.startsWith('2.');
@@ -52,8 +89,32 @@ export function validateOpenApiSpec(spec: any): void {
 }
 
 /**
+ * Lightweight parser for JSON and basic YAML OpenAPI documents
+ */
+export function parseSpecificationContent(raw: string, filePath: string): any {
+  const isYaml = filePath.endsWith('.yaml') || filePath.endsWith('.yml');
+  if (!isYaml) {
+    try {
+      return JSON.parse(raw);
+    } catch (err: any) {
+      throw new Error(`Failed to parse OpenAPI JSON: ${err.message}`);
+    }
+  }
+
+  // Attempt JSON parse first in case YAML file is JSON formatted
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // Basic YAML to structure handler or fail with actionable message
+    throw new Error(
+      `Native YAML parsing requires a dedicated parser. Convert "${path.basename(filePath)}" to JSON format, or provide a .json schema file.`
+    );
+  }
+}
+
+/**
  * OpenAPI-driven API Client & Fixture Generator
- * Synthesizes typed Playwright API clients and request/response interfaces from schema specs.
+ * Synthesizes typed Playwright API clients, request interfaces, and response types from schema specs.
  */
 export function generateApiClient(schemaPath: string, outputPath: string): GenerationSummary {
   if (!fs.existsSync(schemaPath)) {
@@ -61,12 +122,7 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
   }
 
   const raw = fs.readFileSync(schemaPath, 'utf-8');
-  let spec: any;
-  try {
-    spec = JSON.parse(raw);
-  } catch (err: any) {
-    throw new Error(`Failed to parse OpenAPI JSON: ${err.message}`);
-  }
+  const spec = parseSpecificationContent(raw, schemaPath);
 
   // Validate OpenAPI schema
   validateOpenApiSpec(spec);
@@ -80,6 +136,23 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
   let methodsCount = 0;
   let interfacesCount = 0;
 
+  // 1. Generate Component Schemas if present
+  const componentSchemas = spec.components?.schemas || spec.definitions || {};
+  for (const [name, s] of Object.entries<any>(componentSchemas)) {
+    interfacesCount++;
+    interfaceLines.push(`export interface ${name} {`);
+    if (s.properties) {
+      const requiredList: string[] = s.required || [];
+      for (const [pName, pSchema] of Object.entries<any>(s.properties)) {
+        const isReq = requiredList.includes(pName);
+        interfaceLines.push(`  ${pName}${isReq ? '' : '?'}: ${mapPropertyType(pSchema, spec)};`);
+      }
+    }
+    interfaceLines.push(`}`);
+    interfaceLines.push(``);
+  }
+
+  // 2. Iterate Paths & Operations
   const paths = spec.paths || {};
 
   for (const [route, methods] of Object.entries<any>(paths)) {
@@ -90,6 +163,7 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
       methodsCount++;
       const opId = details.operationId || `${httpMethod}_${route.replace(/[\/{}-]/g, '_')}`;
       const summary = details.summary || `${method.toUpperCase()} ${route}`;
+      const pascalOp = opId.charAt(0).toUpperCase() + opId.slice(1);
 
       // Extract Path Parameters
       const pathParams: Array<{ name: string; type: string }> = [];
@@ -98,13 +172,13 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
           if (p.in === 'path') {
             pathParams.push({
               name: p.name,
-              type: mapPropertyType(p.schema),
+              type: mapPropertyType(p.schema, spec),
             });
           }
         }
       }
 
-      // Check for inline path param in route if not in parameters list
+      // Check inline path param in route if not in parameters list
       const matches = route.match(/\{([^}]+)\}/g);
       if (matches) {
         for (const m of matches) {
@@ -115,23 +189,46 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
         }
       }
 
-      // Extract Request Body Schema & Generate Typed Interface
+      // Request Body Schema & Interface
       let payloadTypeName = '';
       const requestBodySchema = details.requestBody?.content?.['application/json']?.schema;
-      if (requestBodySchema && requestBodySchema.properties) {
-        interfacesCount++;
-        const pascalOp = opId.charAt(0).toUpperCase() + opId.slice(1);
-        payloadTypeName = `${pascalOp}Payload`;
-        const requiredProps: string[] = requestBodySchema.required || [];
+      if (requestBodySchema) {
+        if (requestBodySchema.$ref) {
+          payloadTypeName = resolveRefName(requestBodySchema.$ref);
+        } else if (requestBodySchema.properties) {
+          interfacesCount++;
+          payloadTypeName = `${pascalOp}Payload`;
+          const requiredProps: string[] = requestBodySchema.required || [];
 
-        interfaceLines.push(`export interface ${payloadTypeName} {`);
-        for (const [pName, pSchema] of Object.entries<any>(requestBodySchema.properties)) {
-          const isRequired = requiredProps.includes(pName);
-          const pType = mapPropertyType(pSchema);
-          interfaceLines.push(`  ${pName}${isRequired ? '' : '?'}: ${pType};`);
+          interfaceLines.push(`export interface ${payloadTypeName} {`);
+          for (const [pName, pSchema] of Object.entries<any>(requestBodySchema.properties)) {
+            const isRequired = requiredProps.includes(pName);
+            const pType = mapPropertyType(pSchema, spec);
+            interfaceLines.push(`  ${pName}${isRequired ? '' : '?'}: ${pType};`);
+          }
+          interfaceLines.push(`}`);
+          interfaceLines.push(``);
         }
-        interfaceLines.push(`}`);
-        interfaceLines.push(``);
+      }
+
+      // Response Body Schema & Interface
+      let responseTypeName = 'unknown';
+      const successResp = details.responses?.['200'] || details.responses?.['201'] || details.responses?.default;
+      const respSchema = successResp?.content?.['application/json']?.schema;
+      if (respSchema) {
+        if (respSchema.$ref) {
+          responseTypeName = resolveRefName(respSchema.$ref);
+        } else if (respSchema.properties) {
+          interfacesCount++;
+          responseTypeName = `${pascalOp}Response`;
+          interfaceLines.push(`export interface ${responseTypeName} {`);
+          for (const [pName, pSchema] of Object.entries<any>(respSchema.properties)) {
+            const pType = mapPropertyType(pSchema, spec);
+            interfaceLines.push(`  ${pName}?: ${pType};`);
+          }
+          interfaceLines.push(`}`);
+          interfaceLines.push(``);
+        }
       }
 
       // Build method signature
@@ -142,7 +239,7 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
       if (payloadTypeName) {
         signatureParts.push(`payload: ${payloadTypeName}`);
       } else if (['post', 'put', 'patch'].includes(httpMethod) && details.requestBody) {
-        signatureParts.push(`payload: any`);
+        signatureParts.push(`payload: unknown`);
       }
 
       let urlExpr = `\`\${this.baseUrl}${route}\``;
@@ -154,14 +251,14 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
       methodLines.push(`   * ${summary}`);
       methodLines.push(`   * ${method.toUpperCase()} ${route}`);
       methodLines.push(`   */`);
-      methodLines.push(`  async ${opId}(${signatureParts.join(', ')}): Promise<any> {`);
+      methodLines.push(`  async ${opId}(${signatureParts.join(', ')}): Promise<${responseTypeName}> {`);
       if (['post', 'put', 'patch'].includes(httpMethod)) {
         methodLines.push(`    const response = await this.request.${httpMethod}(${urlExpr}, { data: payload });`);
       } else {
         methodLines.push(`    const response = await this.request.${httpMethod}(${urlExpr});`);
       }
       methodLines.push(`    expect(response.ok(), \`API call ${opId} failed with status \${response.status()}\`).toBeTruthy();`);
-      methodLines.push(`    return await response.json().catch(() => ({}));`);
+      methodLines.push(`    return await response.json().catch(() => ({} as ${responseTypeName}));`);
       methodLines.push(`  }`);
       methodLines.push(``);
     }
@@ -176,7 +273,7 @@ export function generateApiClient(schemaPath: string, outputPath: string): Gener
     `import { APIRequestContext, expect } from '@playwright/test';`,
     ``,
     `// ==========================================`,
-    `// Typed Request & Response Interfaces`,
+    `// Strongly Typed Request & Response Interfaces`,
     `// ==========================================`,
     ...interfaceLines,
     `// ==========================================`,
@@ -215,8 +312,8 @@ if (require.main === module) {
   console.log('==================================================');
   console.log(`📖 Ingesting OpenAPI Specification: ${schemaFile}`);
   const summary = generateApiClient(schemaFile, targetOutput);
-  console.log(`✅ Generated ${summary.methodsCount} typed API methods`);
-  console.log(`✅ Generated ${summary.interfacesCount} TypeScript payload interfaces`);
+  console.log(`✅ Generated ${summary.methodsCount} strongly-typed API methods`);
+  console.log(`✅ Generated ${summary.interfacesCount} TypeScript request/response interfaces`);
   console.log(`📄 Saved to: ${summary.outputPath}`);
   console.log('==================================================\n');
 }

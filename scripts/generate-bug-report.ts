@@ -7,6 +7,7 @@ export interface BugReportData {
   specPath: string;
   line?: number;
   classification: 'APPLICATION_BUG' | 'LOCATOR_DRIFT' | 'TIMEOUT_LATENCY' | 'ENVIRONMENT_ISSUE';
+  suggestedSeverity: 'Critical (Suggested)' | 'High (Suggested)' | 'Medium (Suggested)' | 'Low (Suggested)';
   errorMessage: string;
   reproCommand: string;
   steps: string[];
@@ -20,18 +21,21 @@ export interface BugReportData {
 /**
  * Classifies failure root cause based on error message patterns
  */
-export function classifyError(errorMsg: string): BugReportData['classification'] {
+export function classifyError(errorMsg: string): {
+  classification: BugReportData['classification'];
+  suggestedSeverity: BugReportData['suggestedSeverity'];
+} {
   const lower = (errorMsg || '').toLowerCase();
   if (lower.includes('500 internal') || lower.includes('crash') || lower.includes('502 bad gateway') || lower.includes('failed to fetch')) {
-    return 'APPLICATION_BUG';
+    return { classification: 'APPLICATION_BUG', suggestedSeverity: 'High (Suggested)' };
   }
   if (lower.includes('strict mode violation') || lower.includes('resolved to') || lower.includes('not visible') || lower.includes('detached')) {
-    return 'LOCATOR_DRIFT';
+    return { classification: 'LOCATOR_DRIFT', suggestedSeverity: 'Medium (Suggested)' };
   }
   if (lower.includes('timeout') || lower.includes('timed out')) {
-    return 'TIMEOUT_LATENCY';
+    return { classification: 'TIMEOUT_LATENCY', suggestedSeverity: 'Medium (Suggested)' };
   }
-  return 'ENVIRONMENT_ISSUE';
+  return { classification: 'ENVIRONMENT_ISSUE', suggestedSeverity: 'Low (Suggested)' };
 }
 
 interface PlaywrightTestResult {
@@ -67,15 +71,15 @@ interface PlaywrightSuite {
   specs?: PlaywrightSpec[];
 }
 
-interface PlaywrightJsonReport {
+export interface PlaywrightJsonReport {
   suites?: PlaywrightSuite[];
   errors?: any[];
 }
 
 /**
- * Recursively parses Playwright suites in report.json to find genuine failed tests
+ * Recursively parses Playwright suites in report.json to find verified failed tests
  */
-function findFailedTestsFromReport(report: PlaywrightJsonReport): Array<{
+export function findFailedTestsFromReport(report: PlaywrightJsonReport): Array<{
   title: string;
   specPath: string;
   line: number;
@@ -136,88 +140,55 @@ function findFailedTestsFromReport(report: PlaywrightJsonReport): Array<{
 }
 
 /**
- * Scans test-results directories for actual failed artifacts (ending in -failed or -retry)
+ * Extracts confirmed bug data strictly from verified execution metadata of the current run session.
+ * Prevents stale artifacts from previous days or unverified folders from generating false defects.
  */
-export function findLatestFailedDirectory(): { dir: string; name: string; files: string[] } | null {
-  const resultsDir = path.resolve(process.cwd(), 'test-results');
-  if (!fs.existsSync(resultsDir)) return null;
+export function extractRealFailure(options: { maxAgeMinutes?: number; reportPath?: string } = {}): BugReportData | null {
+  const maxAgeMinutes = options.maxAgeMinutes ?? 60;
+  const reportPath = options.reportPath || path.resolve(process.cwd(), 'test-results/report.json');
 
-  const entries = fs.readdirSync(resultsDir, { withFileTypes: true });
-  const failedDirs = entries
-    .filter(e => e.isDirectory() && (e.name.endsWith('-failed') || e.name.includes('-retry')))
-    .map(e => ({
-      name: e.name,
-      dir: path.join(resultsDir, e.name),
-      stats: fs.statSync(path.join(resultsDir, e.name)),
-      files: fs.readdirSync(path.join(resultsDir, e.name)),
-    }))
-    .sort((a, b) => b.stats.mtimeMs - a.stats.mtimeMs);
-
-  return failedDirs[0] || null;
-}
-
-/**
- * Extracts confirmed bug data from real Playwright execution artifacts
- */
-export function extractRealFailure(): BugReportData | null {
-  // 1. Try parsing structured JSON report if generated
-  const reportPath = path.resolve(process.cwd(), 'test-results/report.json');
-  if (fs.existsSync(reportPath)) {
-    try {
-      const json: PlaywrightJsonReport = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
-      const failures = findFailedTestsFromReport(json);
-      if (failures.length > 0) {
-        const f = failures[0];
-        const classification = classifyError(f.errorMsg);
-        return {
-          title: f.title,
-          project: f.project,
-          specPath: f.specPath,
-          line: f.line,
-          classification,
-          errorMessage: f.errorMsg,
-          reproCommand: `npx playwright test ${f.specPath}${f.line ? ':' + f.line : ''} --project=${f.project} --headed`,
-          steps: [
-            `Initialize session and authentication for ${f.project}.`,
-            `Execute test scenario defined in ${f.specPath}.`,
-            `Failure encountered at line ${f.line}.`,
-          ],
-          expected: 'Test assertions pass and target UI interaction completes without error.',
-          actual: f.errorMsg.split('\n')[0] || 'Assertion failure or execution timeout.',
-          screenshotPath: f.attachments.screenshot,
-          tracePath: f.attachments.trace,
-          videoPath: f.attachments.video,
-        };
-      }
-    } catch {
-      // Fallback to directory inspection if JSON parse fails
-    }
+  if (!fs.existsSync(reportPath)) {
+    return null;
   }
 
-  // 2. Fallback: inspect verified failed directories
-  const failedDir = findLatestFailedDirectory();
-  if (failedDir) {
-    const screenshot = failedDir.files.find(f => f.endsWith('.png'));
-    const trace = failedDir.files.find(f => f.endsWith('.zip'));
-    const video = failedDir.files.find(f => f.endsWith('.webm'));
-    const errorSnippet = `Automated execution failed in artifact folder: ${failedDir.name}`;
+  // Verify artifact freshness (must be from the active execution session)
+  const stat = fs.statSync(reportPath);
+  const ageMinutes = (Date.now() - stat.mtimeMs) / (1000 * 60);
+  if (ageMinutes > maxAgeMinutes) {
+    console.log(`ℹ️  Found ${reportPath}, but it is ${Math.round(ageMinutes)} minutes old (exceeds session threshold of ${maxAgeMinutes}m).`);
+    console.log(`   Ignoring stale report to prevent obsolete defect filing.`);
+    return null;
+  }
 
-    return {
-      title: `Execution failure in ${failedDir.name}`,
-      project: failedDir.name.includes('ordering') ? 'ordering' : failedDir.name.includes('admin') ? 'admin' : failedDir.name.includes('e2e') ? 'e2e-bridge' : 'fulfillment',
-      specPath: 'Identified from test-results artifact',
-      classification: classifyError(errorSnippet),
-      errorMessage: errorSnippet,
-      reproCommand: `npx playwright test --project=${failedDir.name.includes('e2e') ? 'e2e-bridge' : 'fulfillment'} --headed`,
-      steps: [
-        'Review attached trace and screenshot artifacts to reproduce failed steps.',
-      ],
-      expected: 'Test action succeeds without exceeding timeout threshold.',
-      actual: 'Execution generated failure artifacts in test-results directory.',
-      screenshotPath: screenshot ? path.join('test-results', failedDir.name, screenshot) : undefined,
-      tracePath: trace ? path.join('test-results', failedDir.name, trace) : undefined,
-      videoPath: video ? path.join('test-results', failedDir.name, video) : undefined,
-    };
+  try {
+    const json: PlaywrightJsonReport = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+    const failures = findFailedTestsFromReport(json);
+    if (failures.length > 0) {
+      const f = failures[0];
+      const { classification, suggestedSeverity } = classifyError(f.errorMsg);
+      return {
+        title: f.title,
+        project: f.project,
+        specPath: f.specPath,
+        line: f.line,
+        classification,
+        suggestedSeverity,
+        errorMessage: f.errorMsg,
+        reproCommand: `npx playwright test ${f.specPath}${f.line ? ':' + f.line : ''} --project=${f.project} --headed`,
+        steps: [
+          `Initialize pre-authenticated session for ${f.project}.`,
+          `Execute test scenario defined in ${f.specPath}.`,
+          `Assertion failure or timeout occurred at line ${f.line}.`,
+        ],
+        expected: 'Test assertions pass and target UI interaction completes without error.',
+        actual: f.errorMsg.split('\n')[0] || 'Assertion failure or execution timeout.',
+        screenshotPath: f.attachments.screenshot,
+        tracePath: f.attachments.trace,
+        videoPath: f.attachments.video,
+      };
+    }
+  } catch {
+    // Malformed report
   }
 
   return null;
@@ -229,11 +200,11 @@ export function extractRealFailure(): BugReportData | null {
 export function formatGitHubMarkdown(data: BugReportData): string {
   return `### 🐞 [BUG][${data.project.toUpperCase()}] ${data.title}
 
-- **Severity:** Major / Blocker
+- **Severity (Untriaged):** \`${data.suggestedSeverity}\`
 - **Classification:** \`${data.classification}\`
 - **Spec:** \`${data.specPath}${data.line ? ':' + data.line : ''}\`
 - **Environment:** Dev (\`ftx.dev.ftxcommerce.com\`)
-- **Reported By:** Automated SDET Bug Reporter (Playwright Real Run Metadata)
+- **Reported By:** Automated SDET Bug Reporter (Verified Current Session Metadata)
 
 ---
 
@@ -275,7 +246,7 @@ ${data.errorMessage}
 export function formatJiraMarkup(data: BugReportData): string {
   return `h2. 🐞 [BUG][${data.project.toUpperCase()}] ${data.title}
 
-* *Severity:* Major / Blocker
+* *Severity (Untriaged):* {{${data.suggestedSeverity}}}
 * *Classification:* {{${data.classification}}}
 * *Spec:* {{${data.specPath}${data.line ? ':' + data.line : ''}}}
 * *Environment:* Dev (ftx.dev.ftxcommerce.com)
@@ -311,11 +282,10 @@ if (require.main === module) {
 
   if (!failure) {
     console.log('\n==================================================');
-    console.log('✅ SDET BUG REPORTER — Clean Execution Summary');
+    console.log('✅ SDET BUG REPORTER — Execution Status');
     console.log('==================================================');
-    console.log('No failed tests detected in test-results or report.json.');
-    console.log('All tests passed or no execution failures were recorded.');
-    console.log('Zero false-positive defect reports were generated.');
+    console.log('No verified failures detected in the active test execution session.');
+    console.log('Zero false-positive reports generated from stale artifacts.');
     console.log('==================================================\n');
     process.exit(0);
   }

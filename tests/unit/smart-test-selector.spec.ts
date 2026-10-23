@@ -1,12 +1,27 @@
 import { test, expect } from '@playwright/test';
-import { selectTests } from '../../scripts/smart-test-selector';
+import { selectTests, normalizePath } from '../../scripts/smart-test-selector';
 
 test.describe('Smart Test Selector — Unit Test Suite', () => {
-  test('should handle empty changed files array', () => {
-    const result = selectTests([]);
+  test('should normalize Windows backslashes to forward slashes', () => {
+    expect(normalizePath('pages\\ordering\\Storefront.ts')).toBe('pages/ordering/Storefront.ts');
+  });
+
+  test('should handle empty changed files array when git is trusted', () => {
+    const result = selectTests([], { isGitTrusted: true });
     expect(result.allTests).toBeFalsy();
     expect(result.projects.size).toBe(0);
     expect(result.testFiles.size).toBe(0);
+  });
+
+  test('should fail-safe trigger full test suite when Git is untrusted (shallow clone / git error)', () => {
+    const result = selectTests([], {
+      isGitTrusted: false,
+      failureReason: 'git diff failed (shallow clone)',
+    });
+    expect(result.allTests).toBeTruthy();
+    expect(result.projects.size).toBe(4);
+    expect(result.isGitTrusted).toBeFalsy();
+    expect(result.reason).toContain('Git change calculation is uncertain');
   });
 
   test('should map Storefront changes to ordering and e2e-bridge', () => {

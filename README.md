@@ -8,8 +8,8 @@ Enterprise-grade Playwright & TypeScript test automation framework engineered fo
 
 - **Multi-Application Orchestration**: Unified test framework covering Online Ordering storefront, Merchant Admin Portal, Operations Fulfillment, and cross-application integration flows.
 - **5-Phase CI/CD Pipeline**: 3 parallel matrix jobs, dedicated serialized E2E bridge execution (eliminating shared-cart race conditions), unified Allure aggregation with trend history cache, Docker smoke verification, and Office 365 SMTP notifications.
-- **AI-Native SDET Toolchain**: Built-in predictive test execution with fail-safe fallback, automated zero-touch bug reporting from real execution metadata, OpenAPI typed client generator, and machine-readable agent onboarding context.
-- **Enterprise Security**: Zero committed credentials or fallback passwords; strict fail-fast validation via `.env` and GitHub Secrets.
+- **AI-Native SDET Toolchain**: Built-in predictive test execution with fail-safe fallback, automated zero-touch bug reporting from verified session metadata, OpenAPI typed client generator with response interfaces, and machine-readable agent onboarding context.
+- **Enterprise Security**: Zero committed credentials or fallback passwords; strict fail-fast validation across both local and CI environments via `.env` and GitHub Secrets.
 - **Deterministic Reliability**: Custom Page Object Model with condition-based polling helpers, segregated session caching (`storageState`), and single-worker execution for shared test environments.
 
 ---
@@ -41,7 +41,7 @@ npx playwright install chromium
 # 3. Create .env from template and configure credentials
 cp .env.example .env
 
-# 4. Run quality gate (TypeScript type-safety + Unit tests + Selector validation)
+# 4. Run quality gate (TypeScript type-safety + 24 Unit tests + Selector validation)
 npm run quality:gate
 
 # 5. Execute all test suites (Default: Dev environment)
@@ -58,7 +58,7 @@ npm test
 | **`ordering`** | • Storefront category browsing & skeleton loader synchronization<br>• Dynamic cart item additions & quantity adjustments<br>• Multi-step checkout with "Pay At Store" & time-slot selection<br>• Legal compliance authorization toggle & order placement | `tests/ordering/ordering-storefront-flow.spec.ts` |
 | **`fulfillment`** | • Pending Orders 5-action menu, search, pagination<br>• End-to-end Picking workflow: Item Picking -> Delivery Handling -> Staging -> Mark Ready<br>• In Progress Orders table & status validation<br>• Fulfilled Orders table & order history<br>• All Orders table & search filters<br>• Manage Staging Area location inventory | `tests/fulfillment/fulfillment-pending-orders.spec.ts`<br>`tests/fulfillment/fulfillment-sidebar-modules.spec.ts` |
 | **`e2e-bridge`** | • Customer places real order on Online Ordering storefront<br>• Cross-boundary order ID propagation to Fulfillment<br>• Fulfillment employee searches order & opens details modal<br>• Item picking, staging container assignment, and Ready status dispatch<br>• Curbside arrival notice, vehicle details, and parking spot check-in<br>• Physical Gift Card full lifecycle: Admin creation → Storefront purchase → Fulfillment activation | `tests/e2e-bridge/cross-app-ordering-to-fulfillment.spec.ts`<br>`tests/e2e-bridge/flow1-store-pickup-card.spec.ts`<br>`tests/e2e-bridge/flow2-curbside-mobile-arrival.spec.ts`<br>`tests/e2e-bridge/physical-gift-card-lifecycle.spec.ts` |
-| **`unit`** | • Smart Test Selector rule mapping verification<br>• OpenAPI spec validation & client generator tests | `tests/unit/smart-test-selector.spec.ts`<br>`tests/unit/api-fixture-generator.spec.ts` |
+| **`unit`** | • Smart Test Selector rule mapping & untrusted shallow-clone fallback (11 tests)<br>• Fail-fast environment secret validation & bypass mechanisms (4 tests)<br>• Current-session defect reporter parsing & suggested severity (5 tests)<br>• OpenAPI $ref resolution, schema validation & typed client generation (4 tests) | `tests/unit/smart-test-selector.spec.ts`<br>`tests/unit/environment-security.spec.ts`<br>`tests/unit/bug-reporter.spec.ts`<br>`tests/unit/api-fixture-generator.spec.ts` |
 
 ---
 
@@ -71,9 +71,9 @@ A comprehensive, machine-readable repository map providing AI agents with locato
 
 ### 2. Smart Predictive Test Selector (`npm run test:changed`)
 Inspects `git diff` against `main`, maps changed source files to corresponding test suites, and executes only impacted tests.
-- **Fail-Safe Fallback**: If an unmapped or unknown file is modified, the selector automatically defaults to running the full test suite (`allTests: true`).
+- **Fail-Safe Fallback**: If an unmapped file is modified OR if Git history is uncertain (e.g. shallow clone, truncated history, detached HEAD), the selector automatically defaults to running the full test suite (`allTests: true`).
 - **Shared Dependency Mapping**: Changes to `pages/BasePage.ts`, `fixtures/`, `utils/`, or `config/` automatically trigger all test projects.
-- **Automated Unit Tests**: Verified by `tests/unit/smart-test-selector.spec.ts`.
+- **Automated Unit Tests**: 11 unit tests in `tests/unit/smart-test-selector.spec.ts`.
 
 ```bash
 # Dry run: preview affected projects and spec files
@@ -83,8 +83,10 @@ npm run test:changed:list
 npm run test:changed
 ```
 
-### 3. Zero-Touch Defect Triage & Reporter (`npm run report:bug`)
-Extracts confirmed test failure data directly from Playwright's JSON report (`test-results/report.json`) or verified failure directories (`*-failed`).
+### 3. Current-Session Defect Reporter (`npm run report:bug`)
+Extracts confirmed test failure data strictly from the active execution session (`test-results/report.json`).
+- **Session Freshness & Zero Stale Artifacts**: Rejects outdated artifacts (>60m) to ensure stale results from previous runs do not produce false defects.
+- **Dynamic Suggested Severity**: Labels severity objectively as `Suggested / Untriaged` (High for crash/500, Medium for locator/timeout, Low for environmental).
 - **Zero False-Positives**: If all tests pass, reports clean execution and avoids generating fabricated defects.
 - **Automated Artifact Extraction**: Captures real spec file, line number, stack trace, screenshot, trace ZIP, and video into structured GitHub Markdown or Jira format.
 
@@ -97,7 +99,7 @@ npm run report:bug -- --jira
 ```
 
 ### 4. OpenAPI-Driven API Client Generator (`npm run api:generate-fixtures`)
-Ingests OpenAPI specifications, validates schema structure, and synthesizes strongly typed TypeScript payload interfaces and Playwright API client methods:
+Ingests OpenAPI specifications, validates schema structure, resolves `$ref` pointers, and synthesizes strongly typed TypeScript request payloads, response interfaces (`CheckoutOrderResponse`, `GetGiftCardStatusResponse`), and Playwright API client methods:
 
 ```bash
 npm run api:generate-fixtures
@@ -110,13 +112,13 @@ npm run api:generate-fixtures
 To enforce code health and maintainability across team members and automated PR checks:
 
 ```bash
-# Runs full TypeScript typecheck + Unit test suite + Predictive selector validation
+# Runs full TypeScript typecheck + 24 Unit tests + Predictive selector validation
 npm run quality:gate
 
 # Typecheck only (Strict mode, noEmit)
 npm run typecheck
 
-# Run unit tests only
+# Run 24 unit tests only
 npm run test:unit
 ```
 
@@ -137,9 +139,10 @@ npm run test:unit
    - Allure reports deployed to GitHub Pages display only sanitized application UI screenshots, synthesized order numbers, and framework execution metrics.
    - For private or regulated enterprise environments, GitHub Pages access can be scoped to internal organization members via GitHub Enterprise repository settings.
 
-3. **Zero Secrets in Code (Fail-Fast Enforcement)**:
+3. **Zero Secrets in Code (Fail-Fast Enforcement Across Local & CI)**:
    - `config/environment.ts` reads credentials strictly from environment variables without hardcoded fallback strings.
-   - Enforces a strict fail-fast check: in CI or execution environments, missing credentials throw a descriptive error immediately.
+   - Enforces a strict fail-fast check: in local test runs or CI, missing credentials throw an immediate `[Security Gate]` error.
+   - Explicit dry-run bypass available via `SKIP_CREDENTIAL_CHECK=true` for linting and unit tests.
 
 ---
 
@@ -191,7 +194,7 @@ flowchart TD
 
 1. **Phase 1: `test` Matrix (3 Parallel Jobs)**:
    - Matrix runs `ordering`, `admin`, and `fulfillment` in parallel on `ubuntu-24.04`.
-   - Enforces pre-execution Quality Gate (`npm run quality:gate`: strict typecheck + unit tests + selector validation).
+   - Enforces pre-execution Quality Gate (`npm run quality:gate`: strict typecheck + 24 unit tests + selector validation).
    - Uploads scoped artifacts: `playwright-report-<project>` and `allure-results-<project>`.
 
 2. **Phase 2: `e2e-bridge` (Dedicated Sequential Runner)**:
@@ -301,12 +304,12 @@ npm run docker:allure
 | `npm run test:admin` | Run Admin Portal tests |
 | `npm run test:fulfillment` | Run Fulfillment App operations tests |
 | `npm run test:e2e-bridge` | Run Cross-Application E2E integration bridge |
-| `npm run test:unit` | Run unit test suite (Smart selector & OpenAPI generator tests) |
+| `npm run test:unit` | Run 24 unit tests (Selector, Security, Bug Reporter & OpenAPI generator) |
 | `npm run test:changed` | Run only tests affected by recent git changes (Predictive SDET) |
 | `npm run test:changed:list` | Preview affected tests without execution |
 | `npm run report:bug` | Generate automated Markdown bug report from verified test failures |
-| `npm run api:generate-fixtures` | Synthesize typed API client and interfaces from OpenAPI specifications |
-| `npm run quality:gate` | Strict quality gate (Typecheck + Unit tests + Selector validation) |
+| `npm run api:generate-fixtures` | Synthesize typed API client, payload and response interfaces from OpenAPI |
+| `npm run quality:gate` | Strict quality gate (Typecheck + 24 Unit tests + Selector validation) |
 | `npm run typecheck` | Run TypeScript validation (`tsc --noEmit`) |
 | `npm run test:headed` | Run tests with browser UI visible |
 | `npm run test:ui` | Open Playwright interactive UI mode |

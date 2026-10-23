@@ -21,22 +21,33 @@ export interface SystemConfig {
 }
 
 /**
- * Strict environment variable accessor.
- * In CI or execution mode, fails fast if mandatory credentials are not configured.
+ * Strict fail-fast secret accessor.
+ * Enforces credential presence across ALL environments (local developer machines and CI).
+ * Fails fast immediately if any required credential is empty or missing.
+ *
+ * An explicit bypass is allowed ONLY for non-execution workflows (e.g. typechecking, unit tests, linting)
+ * via `SKIP_CREDENTIAL_CHECK=true`.
  */
-function getRequiredSecret(key: string, appName: string): string {
+export function getRequiredSecret(key: string, appName: string): string {
+  const isBypassed =
+    process.env.SKIP_CREDENTIAL_CHECK === 'true' ||
+    process.env.npm_lifecycle_event === 'typecheck';
   const value = process.env[key];
+
   if (!value || value.trim() === '') {
-    // In CI or production test runs, fail immediately to prevent silent credential failures
-    if (process.env.CI) {
-      throw new Error(`[Security Gate] Missing required credential secret: "${key}" for ${appName}. Configure it in GitHub Secrets or your local .env file.`);
+    if (isBypassed) {
+      return '';
     }
-    return '';
+    throw new Error(
+      `[Security Gate] Missing required credential secret: "${key}" for ${appName}.\n` +
+      `Configure it in your local .env file or environment variables before executing tests.\n` +
+      `See .env.example for template instructions, or export SKIP_CREDENTIAL_CHECK=true for dry-run verification.`
+    );
   }
   return value.trim();
 }
 
-function getBaseUrl(key: string, defaultUrl: string): string {
+export function getBaseUrl(key: string, defaultUrl: string): string {
   return process.env[key]?.trim() || defaultUrl;
 }
 

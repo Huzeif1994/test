@@ -7,6 +7,7 @@ export interface SelectionResult {
   testFiles: Set<string>;
   changedFiles: string[];
   docsOnly: boolean;
+  isGitTrusted: boolean;
   reason: string;
 }
 
@@ -17,62 +18,114 @@ export function normalizePath(p: string): string {
   return p.replace(/\\/g, '/').trim();
 }
 
+export interface GitDiffDetection {
+  files: string[];
+  isGitTrusted: boolean;
+  failureReason?: string;
+}
+
 /**
- * Inspects Git diff to determine changed files
+ * Inspects Git diff to determine changed files.
+ * If Git history cannot be reliably determined (shallow clone, missing base ref, detached HEAD),
+ * flags isGitTrusted = false so callers fail-safe to running all tests.
  */
-export function getChangedFiles(): string[] {
+export function getChangedFiles(): GitDiffDetection {
   const files = new Set<string>();
+  let isGitTrusted = true;
+  let failureReason: string | undefined;
 
   // 1. Check uncommitted changes (unstaged and staged)
   try {
-    const statusOutput = execSync('git status --porcelain', { encoding: 'utf-8' });
+    const statusOutput = execSync('git status --porcelain', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
     for (const line of statusOutput.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      // Format is "XY filename" or "XY old -> new"
       const filePath = trimmed.substring(2).trim().split(' -> ').pop()?.trim();
       if (filePath) {
         files.add(normalizePath(filePath));
       }
     }
-  } catch {
-    // Non-fatal if git status fails
+  } catch (err: any) {
+    isGitTrusted = false;
+    failureReason = `git status failed: ${err.message}`;
   }
 
   // 2. Check diff against base branch (main/master) or previous commit
   try {
     let diffTarget = 'HEAD~1';
-    try {
-      execSync('git rev-parse --verify origin/main', { stdio: 'ignore' });
-      diffTarget = 'origin/main...HEAD';
-    } catch {
+    let baseRefFound = false;
+
+    // Check GITHUB_BASE_REF in PR runs
+    if (process.env.GITHUB_BASE_REF) {
       try {
-        execSync('git rev-parse --verify main', { stdio: 'ignore' });
-        diffTarget = 'main...HEAD';
+        execSync(`git rev-parse --verify origin/${process.env.GITHUB_BASE_REF}`, { stdio: 'ignore' });
+        diffTarget = `origin/${process.env.GITHUB_BASE_REF}...HEAD`;
+        baseRefFound = true;
       } catch {
-        diffTarget = 'HEAD~1';
+        // base ref not fetched
       }
     }
 
-    const diffOutput = execSync(`git diff --name-only ${diffTarget}`, { encoding: 'utf-8' });
+    if (!baseRefFound) {
+      try {
+        execSync('git rev-parse --verify origin/main', { stdio: 'ignore' });
+        diffTarget = 'origin/main...HEAD';
+        baseRefFound = true;
+      } catch {
+        try {
+          execSync('git rev-parse --verify main', { stdio: 'ignore' });
+          diffTarget = 'main...HEAD';
+          baseRefFound = true;
+        } catch {
+          diffTarget = 'HEAD~1';
+        }
+      }
+    }
+
+    const diffOutput = execSync(`git diff --name-only ${diffTarget}`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
     for (const file of diffOutput.split('\n')) {
       const clean = normalizePath(file);
       if (clean) files.add(clean);
     }
-  } catch {
-    // Non-fatal if git diff fails
+  } catch (err: any) {
+    // In CI or shallow clones, if commit history is truncated (--depth=1), git diff fails
+    if (process.env.CI) {
+      isGitTrusted = false;
+      failureReason = `git diff failed in CI (possible shallow clone or missing base commit): ${err.message}`;
+    }
   }
 
-  return Array.from(files);
+  return {
+    files: Array.from(files),
+    isGitTrusted,
+    failureReason,
+  };
 }
 
 /**
  * Core Predictive Selector Rule Engine
  */
-export function selectTests(changedFiles: string[]): SelectionResult {
+export function selectTests(
+  changedFiles: string[],
+  options: { isGitTrusted?: boolean; failureReason?: string } = {}
+): SelectionResult {
+  const isGitTrusted = options.isGitTrusted ?? true;
   const projects = new Set<string>();
   const testFiles = new Set<string>();
   const allProjectsList = ['ordering', 'fulfillment', 'admin', 'e2e-bridge'];
+
+  // Fail-Safe: If Git state is untrusted (shallow clone, missing commits, git errors), run all tests
+  if (!isGitTrusted) {
+    return {
+      allTests: true,
+      projects: new Set(allProjectsList),
+      testFiles: new Set(['tests/']),
+      changedFiles,
+      docsOnly: false,
+      isGitTrusted: false,
+      reason: `Git change calculation is uncertain (${options.failureReason || 'truncated commit history'}). Defaulting to full test suite for fail-safe safety.`,
+    };
+  }
 
   if (changedFiles.length === 0) {
     return {
@@ -81,6 +134,7 @@ export function selectTests(changedFiles: string[]): SelectionResult {
       testFiles,
       changedFiles,
       docsOnly: false,
+      isGitTrusted: true,
       reason: 'No changed files detected in Git.',
     };
   }
@@ -109,6 +163,7 @@ export function selectTests(changedFiles: string[]): SelectionResult {
         testFiles: new Set(['tests/']),
         changedFiles,
         docsOnly: false,
+        isGitTrusted: true,
         reason: `Shared architectural dependency or global infrastructure changed: ${file}`,
       };
     }
@@ -130,6 +185,7 @@ export function selectTests(changedFiles: string[]): SelectionResult {
       testFiles,
       changedFiles,
       docsOnly: true,
+      isGitTrusted: true,
       reason: 'Only documentation or repository metadata files changed (no code changes).',
     };
   }
@@ -206,6 +262,7 @@ export function selectTests(changedFiles: string[]): SelectionResult {
       testFiles: new Set(['tests/']),
       changedFiles,
       docsOnly: false,
+      isGitTrusted: true,
       reason: `Unmapped source file detected (${unmappedFile}). Defaulting to full test suite for fail-safe safety.`,
     };
   }
@@ -216,6 +273,7 @@ export function selectTests(changedFiles: string[]): SelectionResult {
     testFiles,
     changedFiles,
     docsOnly: false,
+    isGitTrusted: true,
     reason: `Targeted tests mapped for ${nonDocFiles.length} application source file(s).`,
   };
 }
@@ -227,8 +285,11 @@ if (require.main === module) {
   const asJson = args.includes('--json');
   const isHeaded = args.includes('--headed');
 
-  const changed = getChangedFiles();
-  const selection = selectTests(changed);
+  const diffResult = getChangedFiles();
+  const selection = selectTests(diffResult.files, {
+    isGitTrusted: diffResult.isGitTrusted,
+    failureReason: diffResult.failureReason,
+  });
 
   if (asJson) {
     console.log(
@@ -239,6 +300,7 @@ if (require.main === module) {
           testFiles: Array.from(selection.testFiles),
           changedFiles: selection.changedFiles,
           docsOnly: selection.docsOnly,
+          isGitTrusted: selection.isGitTrusted,
           reason: selection.reason,
         },
         null,
@@ -251,8 +313,8 @@ if (require.main === module) {
   console.log('\n==================================================');
   console.log('🎯 SMART TEST SELECTOR — Predictive Playwright Runner');
   console.log('==================================================');
-  console.log(`📋 Changed Files Detected (${changed.length}):`);
-  changed.forEach(f => console.log(`   - ${f}`));
+  console.log(`📋 Changed Files Detected (${diffResult.files.length}):`);
+  diffResult.files.forEach(f => console.log(`   - ${f}`));
   console.log('--------------------------------------------------');
   console.log(`💡 Reason: ${selection.reason}`);
   console.log(`🚀 Selected Projects: ${Array.from(selection.projects).join(', ') || 'None'}`);
