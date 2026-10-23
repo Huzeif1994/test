@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ordering, admin, fulfillment, e2e-bridge]
+        project: [ordering, admin, fulfillment]
     steps:
       - uses: actions/checkout@v4
 
@@ -81,10 +81,50 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+  # Job 1.5: Cross-App E2E Bridge (Runs after ordering to prevent shared storefront cart collision)
+  e2e-bridge:
+    name: Tests (e2e-bridge)
+    needs: test
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E Bridge tests
+        run: npx playwright test --project=e2e-bridge
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-e2e-bridge
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: allure-results-e2e-bridge
+          path: allure-results/
+          retention-days: 14
+          if-no-files-found: warn
+
   # Job 2: Teeno browsers ke Allure results jodke ek report banao
   allure-report:
     name: Allure report
-    needs: test
+    needs: [test, e2e-bridge]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -192,7 +232,7 @@ jobs:
             -v "$PWD/playwright-report:/app/playwright-report" \
             -v "$PWD/test-results:/app/test-results" \
             -v "$PWD/allure-results:/app/allure-results" \
-            playwright-huzeif:ci npx playwright test --project=ordering
+            playwright-huzeif:ci npx playwright test --project=admin
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -215,14 +255,14 @@ jobs:
   # Job 5: Send Status Notification via Email & Add Summary
   notify:
     name: Notification & Summary
-    needs: [test, allure-report, deploy-report, docker]
+    needs: [test, e2e-bridge, allure-report, deploy-report, docker]
     if: always()
     runs-on: ubuntu-24.04
     steps:
       - name: Calculate test outcome
         id: outcome
         run: |
-          if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.docker.result }}" = "success" ]; then
+          if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.e2e-bridge.result }}" = "success" ] && [ "${{ needs.docker.result }}" = "success" ]; then
             echo "status_title=PASSED" >> $GITHUB_OUTPUT
             echo "status_color=#28a745" >> $GITHUB_OUTPUT
             echo "status_badge=✅ SUCCESS" >> $GITHUB_OUTPUT

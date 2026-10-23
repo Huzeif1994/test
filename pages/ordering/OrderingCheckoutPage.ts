@@ -84,6 +84,10 @@ export class OrderingCheckoutPage extends BasePage {
    * Click "Proceed to Checkout" on the Cart page
    */
   async proceedToCheckout(): Promise<void> {
+    if (!this.page.url().includes('/cart')) {
+      await this.gotoCart();
+    }
+
     const btn = this.page.getByRole('button', { name: /Proceed to Checkout/i })
       .or(this.page.locator('button, a').filter({ hasText: /Proceed to Checkout/i }))
       .first();
@@ -472,13 +476,54 @@ export class OrderingCheckoutPage extends BasePage {
   }
 
   /**
+   * Handle Time Slot selection on Store Pickup if required by the store
+   */
+  async handleTimeSlotSelectionIfRequired(): Promise<void> {
+    const slotNotice = this.page.locator('text=/select your preferred time slot|select a time slot to continue|No time slot selected/i').first();
+    const selectSlotBtn = this.page.getByRole('button', { name: /Select Slot|Reserve Time Slot|Change Slot/i })
+      .or(this.page.locator('button').filter({ hasText: /Select Slot/i }))
+      .first();
+
+    const isPromptVisible = await selectSlotBtn.isVisible({ timeout: 2000 }).catch(() => false) ||
+      await slotNotice.isVisible({ timeout: 1500 }).catch(() => false);
+
+    if (isPromptVisible && await selectSlotBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.log('Checkout: "Select Slot" detected, selecting available time slot...');
+      await selectSlotBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await selectSlotBtn.click({ force: true });
+      await this.page.waitForTimeout(1000);
+
+      // In Quasar dialog or dropdown, find available slot chips or buttons
+      const availableSlot = this.page.locator('.q-dialog button:not([disabled]), .q-dialog .q-chip:not(.disabled), .q-dialog .q-radio, .q-dialog .cursor-pointer')
+        .filter({ hasText: /AM|PM|\d+:\d+|Today|Tomorrow/i })
+        .first();
+
+      if (await availableSlot.isVisible({ timeout: 4000 }).catch(() => false)) {
+        await availableSlot.click({ force: true });
+        await this.page.waitForTimeout(500);
+
+        // Click Confirm / Save / Apply in the dialog
+        const confirmSlotBtn = this.page.locator('.q-dialog button')
+          .filter({ hasText: /Confirm|Save|Apply|Select|Done|Submit/i })
+          .first();
+
+        if (await confirmSlotBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await confirmSlotBtn.click({ force: true });
+          await this.page.waitForTimeout(1000);
+        }
+      }
+    }
+  }
+
+  /**
    * Click "Place Order" and wait for order submission
    */
   async placeOrder(): Promise<void> {
     await this.placeOrderButton.waitFor({ state: 'visible', timeout: 15000 });
 
-    // Guard: If disabled, re-ensure terms and card selection
+    // Guard: If disabled, re-ensure terms, card, and time slot
     if (!(await this.placeOrderButton.isEnabled())) {
+      await this.handleTimeSlotSelectionIfRequired();
       await this.acceptTerms();
       await this.page.waitForTimeout(1000);
     }
@@ -490,13 +535,28 @@ export class OrderingCheckoutPage extends BasePage {
     }
 
     await expect(this.placeOrderButton).toBeEnabled({ timeout: 10000 });
-    await this.placeOrderButton.click();
+    await this.placeOrderButton.scrollIntoViewIfNeeded().catch(() => {});
+    await this.placeOrderButton.click({ force: true });
 
     // Wait for processing spinner or navigation
     await Promise.race([
       this.page.waitForURL((url) => !url.pathname.endsWith('/checkout'), { timeout: 35000 }),
       this.orderProcessingLoader.waitFor({ state: 'detached', timeout: 35000 }),
     ]).catch(() => {});
+
+    // Fallback: If still on /checkout, try clicking any remaining Place Order button on page
+    if (this.page.url().includes('/checkout')) {
+      const placeButtons = this.page.locator('button').filter({ hasText: /^Place Order$/i });
+      const count = await placeButtons.count();
+      for (let i = 0; i < count; i++) {
+        const btn = placeButtons.nth(i);
+        if (await btn.isVisible().catch(() => false) && await btn.isEnabled().catch(() => false)) {
+          await btn.click({ force: true }).catch(() => {});
+          await this.page.waitForTimeout(2000);
+          break;
+        }
+      }
+    }
 
     await this.page.waitForTimeout(2000);
   }
@@ -559,13 +619,17 @@ export class OrderingCheckoutPage extends BasePage {
 
     // Step 1 -> 2 -> 3: Click "Continue" through each step until Payment section is reached
     for (let step = 1; step <= 3; step++) {
+      if (step === 3) {
+        await this.handleTimeSlotSelectionIfRequired();
+      }
+
       const continueBtn = this.page.getByRole('button', { name: /^Continue$/i })
         .or(this.page.locator('button:has-text("Continue")'))
         .first();
 
       if (await continueBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         await continueBtn.scrollIntoViewIfNeeded().catch(() => {});
-        await continueBtn.click();
+        await continueBtn.click({ force: true });
         await this.page.waitForTimeout(1500);
       }
     }

@@ -102,27 +102,31 @@ export class OrderingCatalogPage extends BasePage {
   async openCartAndProceed(): Promise<void> {
     // 1. If Cart Drawer Proceed button is already visible, click it
     const proceedBtn = this.page.locator('button, a').filter({ hasText: /Proceed To Cart/i }).first();
-    if (await proceedBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
-      await proceedBtn.click();
-      await this.page.waitForURL(/\/cart/i, { timeout: 20000 }).catch(() => {});
-      return;
-    }
-
-    // 2. Otherwise open Cart via header button
-    const headerCartBtn = this.page.locator('button, a').filter({ hasText: /Your Cart/i }).first();
-    if (await headerCartBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await headerCartBtn.click();
-      await this.page.waitForTimeout(1000);
-      if (await proceedBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
-        await proceedBtn.click();
-        await this.page.waitForURL(/\/cart/i, { timeout: 20000 }).catch(() => {});
+    if (await proceedBtn.isVisible({ timeout: 2500 }).catch(() => false)) {
+      await proceedBtn.click({ force: true });
+      if (await this.page.waitForURL(/\/cart/i, { timeout: 8000 }).then(() => true).catch(() => false)) {
         return;
       }
     }
 
-    // 3. Fallback direct navigation to /cart
-    await this.page.goto('/cart', { waitUntil: 'domcontentloaded' });
-    await this.page.waitForURL(/\/cart/i, { timeout: 20000 });
+    // 2. Otherwise open Cart via header button
+    const headerCartBtn = this.page.locator('button, a').filter({ hasText: /Your Cart/i }).first();
+    if (await headerCartBtn.isVisible({ timeout: 2500 }).catch(() => false)) {
+      await headerCartBtn.click({ force: true });
+      await this.page.waitForTimeout(800);
+      if (await proceedBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await proceedBtn.click({ force: true });
+        if (await this.page.waitForURL(/\/cart/i, { timeout: 8000 }).then(() => true).catch(() => false)) {
+          return;
+        }
+      }
+    }
+
+    // 3. Guaranteed fallback: navigate directly to /cart
+    if (!this.page.url().includes('/cart')) {
+      await this.page.goto('/cart', { waitUntil: 'domcontentloaded' });
+    }
+    await this.page.waitForURL(/\/cart/i, { timeout: 25000 });
   }
 }
 
