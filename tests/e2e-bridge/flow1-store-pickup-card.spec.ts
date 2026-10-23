@@ -139,27 +139,8 @@ test.describe('E2E Flow 1: In-Store Pickup with Credit Card & Handover Completio
       await pendingOrdersPage.expectTableLoaded();
 
       if (placedOrderNumber) {
-        // Search exact entire order number so we do not pick any other order
         searchKeyword = placedOrderNumber;
-        console.log('Flow 1: Fulfillment searching exact order number:', searchKeyword);
-        for (let attempt = 0; attempt < 8; attempt++) {
-          await pendingOrdersPage.search(searchKeyword);
-          await pendingOrdersPage.expectTableLoaded();
-          const targetRow = fulfillmentPage.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: searchKeyword }).first();
-          if (await targetRow.isVisible({ timeout: 2000 }).catch(() => false)) {
-            console.log(`Flow 1: Target order ${searchKeyword} found on attempt ${attempt + 1}!`);
-            break;
-          }
-          console.log(`Flow 1: Order not in pending yet, retrying in 3s (attempt ${attempt + 1}/8)...`);
-          const refreshBtn = fulfillmentPage.locator('button').filter({ has: fulfillmentPage.locator('i:has-text("refresh"), .q-icon:has-text("refresh")') }).first();
-          if (await refreshBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
-            await refreshBtn.click();
-          } else {
-            await fulfillmentPage.reload({ waitUntil: 'domcontentloaded' });
-          }
-          await pendingOrdersPage.expectTableLoaded();
-          await fulfillmentPage.waitForTimeout(3000);
-        }
+        await pendingOrdersPage.waitForOrderInPending(searchKeyword);
       }
     });
 

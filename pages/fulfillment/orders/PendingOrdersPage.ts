@@ -139,6 +139,39 @@ export class PendingOrdersPage extends BaseOrdersPage {
   }
 
   /**
+   * Resilient condition-based polling helper for cross-system eventual consistency:
+   * Repeatedly searches for target order, verifying presence in table with reload fallback.
+   */
+  async waitForOrderInPending(orderNumber: string, maxAttempts: number = 8, retryIntervalMs: number = 2500): Promise<Locator> {
+    console.log(`Fulfillment: Waiting for order "${orderNumber}" in Pending Orders (max attempts: ${maxAttempts})...`);
+    const targetRow = this.page.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: orderNumber }).first();
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await this.search(orderNumber);
+      await this.expectTableLoaded();
+
+      const isFound = await targetRow.waitFor({ state: 'visible', timeout: retryIntervalMs })
+        .then(() => true)
+        .catch(() => false);
+
+      if (isFound) {
+        console.log(`Fulfillment: Target order ${orderNumber} located on attempt ${attempt}/${maxAttempts}.`);
+        return targetRow;
+      }
+
+      if (attempt < maxAttempts) {
+        console.log(`Fulfillment: Order not synced yet, refreshing table (attempt ${attempt}/${maxAttempts})...`);
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
+        await this.expectTableLoaded();
+      }
+    }
+
+    // Explicit diagnostic assertion if not found within deadline
+    await expect(targetRow, `Order ${orderNumber} failed to sync to Fulfillment within ${maxAttempts} attempts.`).toBeVisible({ timeout: 5000 });
+    return targetRow;
+  }
+
+  /**
    * Click an order row to open Order Details (/order/:id)
    */
   async openOrderDetail(orderNumber?: string): Promise<void> {

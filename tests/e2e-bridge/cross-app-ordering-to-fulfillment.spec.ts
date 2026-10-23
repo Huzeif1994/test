@@ -91,27 +91,8 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
       await pendingOrdersPage.expectTableLoaded();
 
       if (placedOrderNumber) {
-        // Search exact entire order number so we do not pick any other order
         searchKeyword = placedOrderNumber;
-        console.log('Fulfillment searching for exact order number:', searchKeyword);
-        for (let attempt = 0; attempt < 8; attempt++) {
-          await pendingOrdersPage.search(searchKeyword);
-          await pendingOrdersPage.expectTableLoaded();
-          const targetRow = fulfillmentPage.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: searchKeyword }).first();
-          if (await targetRow.isVisible({ timeout: 2000 }).catch(() => false)) {
-            console.log(`Bridge Test: Target order found: ${searchKeyword}`);
-            break;
-          }
-          console.log(`Bridge Test: Order not visible yet in table, refreshing in 3s (attempt ${attempt + 1}/8)...`);
-          const refreshBtn = fulfillmentPage.locator('button').filter({ has: fulfillmentPage.locator('i:has-text("refresh"), .q-icon:has-text("refresh")') }).first();
-          if (await refreshBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
-            await refreshBtn.click();
-          } else {
-            await fulfillmentPage.reload({ waitUntil: 'domcontentloaded' });
-          }
-          await pendingOrdersPage.expectTableLoaded();
-          await fulfillmentPage.waitForTimeout(3000);
-        }
+        await pendingOrdersPage.waitForOrderInPending(searchKeyword);
       }
     });
 
@@ -203,7 +184,7 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
     // ─────────────────────────────────────────────────────────────
     await test.step('Customer refreshes Orders history and confirms order was processed', async () => {
       await customerPage.goto('/orders', { waitUntil: 'domcontentloaded' });
-      await customerPage.waitForTimeout(2000);
+      await customerPage.locator('.order-card, .q-table tbody tr, .q-card').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     });
 
     const customerVideo = customerPage.video();

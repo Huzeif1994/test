@@ -158,23 +158,7 @@ test.describe('Physical Gift Card Lifecycle: Purchase to Fulfillment to Activati
 
       // Ensure Brand Store filter is set to All Brands so orders from all stores appear
       await pendingOrdersPage.selectBrandStore('All Brands');
-      await pendingOrdersPage.expectTableLoaded();
-
-      console.log('Searching Fulfillment for placed order:', placedOrderNumber);
-      for (let attempt = 0; attempt < 8; attempt++) {
-        await pendingOrdersPage.search(placedOrderNumber);
-        await pendingOrdersPage.expectTableLoaded();
-        const targetRow = fulfillmentPage.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: placedOrderNumber }).first();
-        if (await targetRow.isVisible({ timeout: 2000 }).catch(() => false)) {
-          console.log(`Fulfillment: Target order ${placedOrderNumber} found in Pending list.`);
-          break;
-        }
-        console.log(`Fulfillment: Order not visible yet, refreshing (attempt ${attempt + 1}/8)...`);
-        await fulfillmentPage.reload({ waitUntil: 'domcontentloaded' });
-        await pendingOrdersPage.expectTableLoaded();
-        await fulfillmentPage.waitForTimeout(3000);
-      }
-
+      await pendingOrdersPage.waitForOrderInPending(placedOrderNumber);
       await pendingOrdersPage.openOrderDetail(placedOrderNumber);
       await orderDetailPage.expectOnOrderDetail();
       await orderDetailPage.clickStartPicking();
@@ -222,9 +206,9 @@ test.describe('Physical Gift Card Lifecycle: Purchase to Fulfillment to Activati
       // Click 3-dots action menu -> Start Fulfilling
       const dotsBtn = readyRow.locator('.action-dropdown, button, .q-btn').last();
       await dotsBtn.click();
-      await fulfillmentPage.waitForTimeout(600);
       const startFulfillItem = fulfillmentPage.locator('.q-menu .q-item, .action-menu .q-item, [role="menuitem"]').filter({ hasText: /Start Fulfilling/i }).first();
-      if (await startFulfillItem.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await startFulfillItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      if (await startFulfillItem.isVisible().catch(() => false)) {
         await startFulfillItem.click();
       } else {
         await readyRow.click();
