@@ -23,7 +23,7 @@ export interface SystemConfig {
 /**
  * Strict fail-fast secret accessor.
  * Enforces credential presence across ALL environments (local developer machines and CI).
- * Fails fast immediately if any required credential is empty or missing.
+ * Evaluated lazily when tests actually authenticate.
  *
  * An explicit bypass is allowed ONLY for non-execution workflows (e.g. typechecking, unit tests, linting)
  * via `SKIP_CREDENTIAL_CHECK=true`.
@@ -40,7 +40,7 @@ export function getRequiredSecret(key: string, appName: string): string {
     }
     throw new Error(
       `[Security Gate] Missing required credential secret: "${key}" for ${appName}.\n` +
-      `Configure it in your local .env file or environment variables before executing tests.\n` +
+      `Configure it in your local .env file or GitHub Actions secrets before executing tests.\n` +
       `See .env.example for template instructions, or export SKIP_CREDENTIAL_CHECK=true for dry-run verification.`
     );
   }
@@ -59,40 +59,40 @@ const environments: Record<EnvironmentName, { ordering: AppConfig; admin: AppCon
     ordering: {
       name: 'Online Ordering (Dev)',
       baseUrl: getBaseUrl('ORDERING_DEV_URL', 'https://ftx.dev.ftxcommerce.com'),
-      user: getRequiredSecret('ORDERING_DEV_USER', 'Online Ordering (Dev)'),
-      password: getRequiredSecret('ORDERING_DEV_PASSWORD', 'Online Ordering (Dev)'),
+      get user() { return getRequiredSecret('ORDERING_DEV_USER', 'Online Ordering (Dev)'); },
+      get password() { return getRequiredSecret('ORDERING_DEV_PASSWORD', 'Online Ordering (Dev)'); },
     },
     admin: {
       name: 'Admin Portal (Dev)',
       baseUrl: getBaseUrl('ADMIN_DEV_URL', 'https://ftx.admin.dev.ftxcommerce.com/'),
-      user: getRequiredSecret('ADMIN_DEV_USER', 'Admin Portal (Dev)'),
-      password: getRequiredSecret('ADMIN_DEV_PASSWORD', 'Admin Portal (Dev)'),
+      get user() { return getRequiredSecret('ADMIN_DEV_USER', 'Admin Portal (Dev)'); },
+      get password() { return getRequiredSecret('ADMIN_DEV_PASSWORD', 'Admin Portal (Dev)'); },
     },
     fulfillment: {
       name: 'Fulfillment App (Dev)',
       baseUrl: getBaseUrl('FULFILLMENT_DEV_URL', 'https://ftx.fulfillment.dev.ftxcommerce.com/'),
-      user: getRequiredSecret('FULFILLMENT_DEV_USER', 'Fulfillment App (Dev)'),
-      password: getRequiredSecret('FULFILLMENT_DEV_PASSWORD', 'Fulfillment App (Dev)'),
+      get user() { return getRequiredSecret('FULFILLMENT_DEV_USER', 'Fulfillment App (Dev)'); },
+      get password() { return getRequiredSecret('FULFILLMENT_DEV_PASSWORD', 'Fulfillment App (Dev)'); },
     },
   },
   staging: {
     ordering: {
       name: 'Online Ordering (Staging)',
       baseUrl: getBaseUrl('ORDERING_STAGING_URL', 'https://ftx.staging.ftxcommerce.com'),
-      user: getRequiredSecret('ORDERING_STAGING_USER', 'Online Ordering (Staging)'),
-      password: getRequiredSecret('ORDERING_STAGING_PASSWORD', 'Online Ordering (Staging)'),
+      get user() { return getRequiredSecret('ORDERING_STAGING_USER', 'Online Ordering (Staging)'); },
+      get password() { return getRequiredSecret('ORDERING_STAGING_PASSWORD', 'Online Ordering (Staging)'); },
     },
     admin: {
       name: 'Admin Portal (Staging)',
       baseUrl: getBaseUrl('ADMIN_STAGING_URL', 'https://ftx.admin.staging.ftxcommerce.com/'),
-      user: getRequiredSecret('ADMIN_STAGING_USER', 'Admin Portal (Staging)'),
-      password: getRequiredSecret('ADMIN_STAGING_PASSWORD', 'Admin Portal (Staging)'),
+      get user() { return getRequiredSecret('ADMIN_STAGING_USER', 'Admin Portal (Staging)'); },
+      get password() { return getRequiredSecret('ADMIN_STAGING_PASSWORD', 'Admin Portal (Staging)'); },
     },
     fulfillment: {
       name: 'Fulfillment App (Staging)',
       baseUrl: getBaseUrl('FULFILLMENT_STAGING_URL', 'https://ftx.fulfillment.staging.ftxcommerce.com/'),
-      user: getRequiredSecret('FULFILLMENT_STAGING_USER', 'Fulfillment App (Staging)'),
-      password: getRequiredSecret('FULFILLMENT_STAGING_PASSWORD', 'Fulfillment App (Staging)'),
+      get user() { return getRequiredSecret('FULFILLMENT_STAGING_USER', 'Fulfillment App (Staging)'); },
+      get password() { return getRequiredSecret('FULFILLMENT_STAGING_PASSWORD', 'Fulfillment App (Staging)'); },
     },
   },
 };

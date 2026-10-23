@@ -54,11 +54,13 @@ jobs:
 
       - run: npm ci
 
-      - name: Enforce Quality Gate (Typecheck + Unit Tests + Mapping Validation)
-        run: npm run quality:gate
-
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
+
+      - name: Enforce Quality Gate (Typecheck + 24 Unit Tests + Mapping Validation)
+        run: npm run quality:gate
+        env:
+          SKIP_CREDENTIAL_CHECK: 'true'
 
       - name: Run tests
         run: npx playwright test --project=${{ matrix.project }}
