@@ -95,8 +95,11 @@ Storefront and Fulfillment use distributed microservices.
 | `npm run test:ordering` | Run Storefront customer tests. |
 | `npm run test:fulfillment` | Run Fulfillment staff tests. |
 | `npm run test:admin` | Run Admin management tests. |
+| `npm run test:unit` | Execute fast Node-level Playwright unit tests for framework scripts. |
 | `npm run test:changed` | **Smart Test Selector:** Runs only tests affected by recent Git changes. |
-| `npm run report:bug` | **Bug Reporter:** Transforms recent test failure into structured Jira/GitHub issue. |
+| `npm run report:bug` | **Bug Reporter:** Transforms verified test failure metadata into structured Jira/GitHub issues. |
+| `npm run api:generate-fixtures` | **OpenAPI Fixture Generator:** Generates typed API client and interfaces from OpenAPI specs. |
+| `npm run quality:gate` | **Strict Quality Gate:** Executes `tsc --noEmit`, unit test suite, and predictive selector validation. |
 | `npm run typecheck` | Run `tsc --noEmit` to verify 100% strict TypeScript types. |
 | `npm run docker:test` | Run tests inside isolated Docker container with `ipc: host`. |
 | `npm run allure:serve` | Generate and launch interactive Allure HTML report. |
@@ -110,4 +113,3 @@ Before authoring code for any new user story or test scenario:
 2. Probe the live DOM in headless and headed states.
 3. Verify Quasar element hierarchy and pseudo-elements.
 4. Record findings in `context/annotations/` before finalizing Page Object Models.
-

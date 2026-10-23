@@ -20,6 +20,26 @@ export interface SystemConfig {
   fulfillment: AppConfig;
 }
 
+/**
+ * Strict environment variable accessor.
+ * In CI or execution mode, fails fast if mandatory credentials are not configured.
+ */
+function getRequiredSecret(key: string, appName: string): string {
+  const value = process.env[key];
+  if (!value || value.trim() === '') {
+    // In CI or production test runs, fail immediately to prevent silent credential failures
+    if (process.env.CI) {
+      throw new Error(`[Security Gate] Missing required credential secret: "${key}" for ${appName}. Configure it in GitHub Secrets or your local .env file.`);
+    }
+    return '';
+  }
+  return value.trim();
+}
+
+function getBaseUrl(key: string, defaultUrl: string): string {
+  return process.env[key]?.trim() || defaultUrl;
+}
+
 // Default to 'dev' if not specified
 const currentEnv: EnvironmentName = (process.env.TEST_ENV?.toLowerCase() === 'staging') ? 'staging' : 'dev';
 
@@ -27,41 +47,41 @@ const environments: Record<EnvironmentName, { ordering: AppConfig; admin: AppCon
   dev: {
     ordering: {
       name: 'Online Ordering (Dev)',
-      baseUrl: process.env.ORDERING_DEV_URL || 'https://ftx.dev.ftxcommerce.com',
-      user: process.env.ORDERING_DEV_USER || '',
-      password: process.env.ORDERING_DEV_PASSWORD || '',
+      baseUrl: getBaseUrl('ORDERING_DEV_URL', 'https://ftx.dev.ftxcommerce.com'),
+      user: getRequiredSecret('ORDERING_DEV_USER', 'Online Ordering (Dev)'),
+      password: getRequiredSecret('ORDERING_DEV_PASSWORD', 'Online Ordering (Dev)'),
     },
     admin: {
       name: 'Admin Portal (Dev)',
-      baseUrl: process.env.ADMIN_DEV_URL || 'https://ftx.admin.dev.ftxcommerce.com/',
-      user: process.env.ADMIN_DEV_USER || '',
-      password: process.env.ADMIN_DEV_PASSWORD || '',
+      baseUrl: getBaseUrl('ADMIN_DEV_URL', 'https://ftx.admin.dev.ftxcommerce.com/'),
+      user: getRequiredSecret('ADMIN_DEV_USER', 'Admin Portal (Dev)'),
+      password: getRequiredSecret('ADMIN_DEV_PASSWORD', 'Admin Portal (Dev)'),
     },
     fulfillment: {
       name: 'Fulfillment App (Dev)',
-      baseUrl: process.env.FULFILLMENT_DEV_URL || 'https://ftx.fulfillment.dev.ftxcommerce.com/',
-      user: process.env.FULFILLMENT_DEV_USER || '',
-      password: process.env.FULFILLMENT_DEV_PASSWORD || '',
+      baseUrl: getBaseUrl('FULFILLMENT_DEV_URL', 'https://ftx.fulfillment.dev.ftxcommerce.com/'),
+      user: getRequiredSecret('FULFILLMENT_DEV_USER', 'Fulfillment App (Dev)'),
+      password: getRequiredSecret('FULFILLMENT_DEV_PASSWORD', 'Fulfillment App (Dev)'),
     },
   },
   staging: {
     ordering: {
       name: 'Online Ordering (Staging)',
-      baseUrl: process.env.ORDERING_STAGING_URL || 'https://ftx.staging.ftxcommerce.com',
-      user: process.env.ORDERING_STAGING_USER || '',
-      password: process.env.ORDERING_STAGING_PASSWORD || '',
+      baseUrl: getBaseUrl('ORDERING_STAGING_URL', 'https://ftx.staging.ftxcommerce.com'),
+      user: getRequiredSecret('ORDERING_STAGING_USER', 'Online Ordering (Staging)'),
+      password: getRequiredSecret('ORDERING_STAGING_PASSWORD', 'Online Ordering (Staging)'),
     },
     admin: {
       name: 'Admin Portal (Staging)',
-      baseUrl: process.env.ADMIN_STAGING_URL || 'https://ftx.admin.staging.ftxcommerce.com/',
-      user: process.env.ADMIN_STAGING_USER || '',
-      password: process.env.ADMIN_STAGING_PASSWORD || '',
+      baseUrl: getBaseUrl('ADMIN_STAGING_URL', 'https://ftx.admin.staging.ftxcommerce.com/'),
+      user: getRequiredSecret('ADMIN_STAGING_USER', 'Admin Portal (Staging)'),
+      password: getRequiredSecret('ADMIN_STAGING_PASSWORD', 'Admin Portal (Staging)'),
     },
     fulfillment: {
       name: 'Fulfillment App (Staging)',
-      baseUrl: process.env.FULFILLMENT_STAGING_URL || 'https://ftx.fulfillment.staging.ftxcommerce.com/',
-      user: process.env.FULFILLMENT_STAGING_USER || '',
-      password: process.env.FULFILLMENT_STAGING_PASSWORD || '',
+      baseUrl: getBaseUrl('FULFILLMENT_STAGING_URL', 'https://ftx.fulfillment.staging.ftxcommerce.com/'),
+      user: getRequiredSecret('FULFILLMENT_STAGING_USER', 'Fulfillment App (Staging)'),
+      password: getRequiredSecret('FULFILLMENT_STAGING_PASSWORD', 'Fulfillment App (Staging)'),
     },
   },
 };

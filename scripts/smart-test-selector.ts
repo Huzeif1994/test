@@ -1,17 +1,24 @@
 import { execSync, spawnSync } from 'child_process';
 import path from 'path';
 
-interface SelectionResult {
+export interface SelectionResult {
   allTests: boolean;
   projects: Set<string>;
   testFiles: Set<string>;
   changedFiles: string[];
+  docsOnly: boolean;
   reason: string;
 }
 
 /**
- * Smart Test Selector
- * Inspects Git diff to determine exactly which Playwright projects & specs to execute.
+ * Normalizes file path to forward slashes
+ */
+export function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/').trim();
+}
+
+/**
+ * Inspects Git diff to determine changed files
  */
 export function getChangedFiles(): string[] {
   const files = new Set<string>();
@@ -25,7 +32,7 @@ export function getChangedFiles(): string[] {
       // Format is "XY filename" or "XY old -> new"
       const filePath = trimmed.substring(2).trim().split(' -> ').pop()?.trim();
       if (filePath) {
-        files.add(filePath.replace(/\\/g, '/'));
+        files.add(normalizePath(filePath));
       }
     }
   } catch {
@@ -34,7 +41,6 @@ export function getChangedFiles(): string[] {
 
   // 2. Check diff against base branch (main/master) or previous commit
   try {
-    // Try origin/main or main or HEAD~1
     let diffTarget = 'HEAD~1';
     try {
       execSync('git rev-parse --verify origin/main', { stdio: 'ignore' });
@@ -50,19 +56,23 @@ export function getChangedFiles(): string[] {
 
     const diffOutput = execSync(`git diff --name-only ${diffTarget}`, { encoding: 'utf-8' });
     for (const file of diffOutput.split('\n')) {
-      const clean = file.trim().replace(/\\/g, '/');
+      const clean = normalizePath(file);
       if (clean) files.add(clean);
     }
   } catch {
-    // Non-fatal if no commits yet
+    // Non-fatal if git diff fails
   }
 
   return Array.from(files);
 }
 
+/**
+ * Core Predictive Selector Rule Engine
+ */
 export function selectTests(changedFiles: string[]): SelectionResult {
   const projects = new Set<string>();
   const testFiles = new Set<string>();
+  const allProjectsList = ['ordering', 'fulfillment', 'admin', 'e2e-bridge'];
 
   if (changedFiles.length === 0) {
     return {
@@ -70,61 +80,134 @@ export function selectTests(changedFiles: string[]): SelectionResult {
       projects,
       testFiles,
       changedFiles,
+      docsOnly: false,
       reason: 'No changed files detected in Git.',
     };
   }
 
-  // Infrastructure / Global configs trigger full test suite
-  const globalPatterns = [
+  // 1. Global infrastructure or Shared Architecture changes -> Full Suite
+  const globalOrSharedPatterns = [
     'playwright.config.ts',
     'package.json',
     'package-lock.json',
+    'tsconfig.json',
     'Dockerfile',
     'docker-compose.yml',
-    'config/environment.ts',
+    'config/',
+    'fixtures/',
+    'pages/BasePage.ts',
+    'utils/',
     '.github/',
   ];
 
   for (const file of changedFiles) {
-    if (globalPatterns.some(p => file.includes(p))) {
+    const matchedGlobal = globalOrSharedPatterns.find(p => file.includes(p));
+    if (matchedGlobal) {
       return {
         allTests: true,
-        projects: new Set(['ordering', 'fulfillment', 'admin', 'e2e-bridge']),
+        projects: new Set(allProjectsList),
         testFiles: new Set(['tests/']),
         changedFiles,
-        reason: `Global configuration or infrastructure changed: ${file}`,
+        docsOnly: false,
+        reason: `Shared architectural dependency or global infrastructure changed: ${file}`,
       };
     }
   }
 
-  for (const file of changedFiles) {
-    // Ordering changes
-    if (file.includes('pages/ordering') || file.includes('tests/ordering')) {
+  // 2. Documentation-only check
+  const isDocFile = (f: string) =>
+    f.endsWith('.md') ||
+    f.endsWith('.txt') ||
+    f.startsWith('docs/') ||
+    f === '.gitignore' ||
+    f === 'LICENSE';
+
+  const nonDocFiles = changedFiles.filter(f => !isDocFile(f));
+  if (nonDocFiles.length === 0) {
+    return {
+      allTests: false,
+      projects,
+      testFiles,
+      changedFiles,
+      docsOnly: true,
+      reason: 'Only documentation or repository metadata files changed (no code changes).',
+    };
+  }
+
+  // 3. Domain and application mapping
+  let hasUnmappedCode = false;
+  let unmappedFile = '';
+
+  for (const file of nonDocFiles) {
+    let matched = false;
+
+    // Online Ordering domain
+    if (file.includes('pages/ordering') || file.includes('tests/ordering') || file.includes('auth.ordering.setup')) {
       projects.add('ordering');
       projects.add('e2e-bridge');
       testFiles.add('tests/ordering/');
       testFiles.add('tests/e2e-bridge/');
+      matched = true;
     }
 
-    // Fulfillment changes
-    if (file.includes('pages/fulfillment') || file.includes('tests/fulfillment')) {
+    // Operations Fulfillment domain
+    if (file.includes('pages/fulfillment') || file.includes('tests/fulfillment') || file.includes('auth.fulfillment.setup')) {
       projects.add('fulfillment');
       projects.add('e2e-bridge');
       testFiles.add('tests/fulfillment/');
       testFiles.add('tests/e2e-bridge/');
+      matched = true;
     }
 
-    // Admin changes
-    if (file.includes('pages/admin') || file.includes('tests/admin')) {
+    // Merchant Admin domain
+    if (file.includes('pages/admin') || file.includes('tests/admin') || file.includes('auth.admin.setup')) {
       projects.add('admin');
       testFiles.add('tests/admin/');
+      matched = true;
     }
 
-    // Direct E2E bridge changes
+    // Cross-App Bridge domain
     if (file.includes('tests/e2e-bridge')) {
       projects.add('e2e-bridge');
       testFiles.add('tests/e2e-bridge/');
+      matched = true;
     }
+
+    // Standalone unit tests
+    if (file.includes('tests/unit/')) {
+      testFiles.add('tests/unit/');
+      matched = true;
+    }
+
+    // Internal scripts
+    if (file.includes('scripts/')) {
+      projects.add('admin'); // smoke validation
+      matched = true;
+    }
+
+    // API Fixtures
+    if (file.includes('api/') || file.includes('schemas/')) {
+      projects.add('ordering');
+      projects.add('fulfillment');
+      matched = true;
+    }
+
+    if (!matched) {
+      hasUnmappedCode = true;
+      unmappedFile = file;
+    }
+  }
+
+  // 4. Fail-Safe Fallback: If any code change is unmapped, default to full suite
+  if (hasUnmappedCode) {
+    return {
+      allTests: true,
+      projects: new Set(allProjectsList),
+      testFiles: new Set(['tests/']),
+      changedFiles,
+      docsOnly: false,
+      reason: `Unmapped source file detected (${unmappedFile}). Defaulting to full test suite for fail-safe safety.`,
+    };
   }
 
   return {
@@ -132,7 +215,8 @@ export function selectTests(changedFiles: string[]): SelectionResult {
     projects,
     testFiles,
     changedFiles,
-    reason: `Targeted tests mapped for ${changedFiles.length} changed file(s).`,
+    docsOnly: false,
+    reason: `Targeted tests mapped for ${nonDocFiles.length} application source file(s).`,
   };
 }
 
@@ -154,6 +238,7 @@ if (require.main === module) {
           projects: Array.from(selection.projects),
           testFiles: Array.from(selection.testFiles),
           changedFiles: selection.changedFiles,
+          docsOnly: selection.docsOnly,
           reason: selection.reason,
         },
         null,
@@ -174,8 +259,13 @@ if (require.main === module) {
   console.log(`📁 Selected Test Targets: ${Array.from(selection.testFiles).join(', ') || 'None'}`);
   console.log('==================================================\n');
 
+  if (selection.docsOnly) {
+    console.log('✨ Documentation change only. Code execution bypassed.');
+    process.exit(0);
+  }
+
   if (selection.testFiles.size === 0 && !selection.allTests) {
-    console.log('✨ No tests required for the changed files.');
+    console.log('ℹ️  No test execution required for these changes.');
     process.exit(0);
   }
 
@@ -183,7 +273,7 @@ if (require.main === module) {
     const playwrightArgs = ['test'];
 
     if (selection.allTests) {
-      // Run all
+      // Run full suite
     } else {
       for (const p of selection.projects) {
         playwrightArgs.push(`--project=${p}`);
@@ -212,4 +302,3 @@ if (require.main === module) {
     console.log(`   Example: npx tsx scripts/smart-test-selector.ts --run\n`);
   }
 }
-

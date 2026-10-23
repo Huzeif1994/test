@@ -1,15 +1,15 @@
 # playwright-huzeif
 
-Enterprise-grade Playwright & TypeScript test automation framework engineered for multi-application commerce ecosystems. Featuring Dockerized execution, Allure reporting with historical trends, 5-phase CI/CD pipelines, and an autonomous AI-native SDET toolchain.
+Enterprise-grade Playwright & TypeScript test automation framework engineered for multi-application commerce ecosystems. Featuring Dockerized execution, Allure reporting with historical trend persistence, 5-phase CI/CD pipelines, and an autonomous AI-native SDET toolchain.
 
 ---
 
 ## 🌟 Architecture Highlights
 
 - **Multi-Application Orchestration**: Unified test framework covering Online Ordering storefront, Merchant Admin Portal, Operations Fulfillment, and cross-application integration flows.
-- **5-Phase CI/CD Pipeline**: 3 parallel matrix jobs, dedicated serialized E2E bridge execution (eliminating shared-cart race conditions), unified Allure aggregation, Docker container verification, and Office 365 SMTP notifications.
-- **AI-Native SDET Toolchain**: Built-in predictive test execution, automated zero-touch bug reporting, OpenAPI RAG mock generator, and machine-readable agent onboarding context.
-- **Enterprise Security**: Zero committed credentials or fallback passwords; strict environment variable validation via `.env` and GitHub Secrets.
+- **5-Phase CI/CD Pipeline**: 3 parallel matrix jobs, dedicated serialized E2E bridge execution (eliminating shared-cart race conditions), unified Allure aggregation with trend history cache, Docker smoke verification, and Office 365 SMTP notifications.
+- **AI-Native SDET Toolchain**: Built-in predictive test execution with fail-safe fallback, automated zero-touch bug reporting from real execution metadata, OpenAPI typed client generator, and machine-readable agent onboarding context.
+- **Enterprise Security**: Zero committed credentials or fallback passwords; strict fail-fast validation via `.env` and GitHub Secrets.
 - **Deterministic Reliability**: Custom Page Object Model with condition-based polling helpers, segregated session caching (`storageState`), and single-worker execution for shared test environments.
 
 ---
@@ -41,7 +41,7 @@ npx playwright install chromium
 # 3. Create .env from template and configure credentials
 cp .env.example .env
 
-# 4. Run quality gate (TypeScript type-safety + Smart Test Selector validation)
+# 4. Run quality gate (TypeScript type-safety + Unit tests + Selector validation)
 npm run quality:gate
 
 # 5. Execute all test suites (Default: Dev environment)
@@ -58,20 +58,25 @@ npm test
 | **`ordering`** | • Storefront category browsing & skeleton loader synchronization<br>• Dynamic cart item additions & quantity adjustments<br>• Multi-step checkout with "Pay At Store" & time-slot selection<br>• Legal compliance authorization toggle & order placement | `tests/ordering/ordering-storefront-flow.spec.ts` |
 | **`fulfillment`** | • Pending Orders 5-action menu, search, pagination<br>• End-to-end Picking workflow: Item Picking -> Delivery Handling -> Staging -> Mark Ready<br>• In Progress Orders table & status validation<br>• Fulfilled Orders table & order history<br>• All Orders table & search filters<br>• Manage Staging Area location inventory | `tests/fulfillment/fulfillment-pending-orders.spec.ts`<br>`tests/fulfillment/fulfillment-sidebar-modules.spec.ts` |
 | **`e2e-bridge`** | • Customer places real order on Online Ordering storefront<br>• Cross-boundary order ID propagation to Fulfillment<br>• Fulfillment employee searches order & opens details modal<br>• Item picking, staging container assignment, and Ready status dispatch<br>• Curbside arrival notice, vehicle details, and parking spot check-in<br>• Physical Gift Card full lifecycle: Admin creation → Storefront purchase → Fulfillment activation | `tests/e2e-bridge/cross-app-ordering-to-fulfillment.spec.ts`<br>`tests/e2e-bridge/flow1-store-pickup-card.spec.ts`<br>`tests/e2e-bridge/flow2-curbside-mobile-arrival.spec.ts`<br>`tests/e2e-bridge/physical-gift-card-lifecycle.spec.ts` |
+| **`unit`** | • Smart Test Selector rule mapping verification<br>• OpenAPI spec validation & client generator tests | `tests/unit/smart-test-selector.spec.ts`<br>`tests/unit/api-fixture-generator.spec.ts` |
 
 ---
 
 ## 🤖 AI-Native SDET Toolchain
 
-This repository implements next-generation autonomous SDET tools designed for pair programming with autonomous AI agents:
+This repository implements autonomous SDET tools designed for pair programming with autonomous AI agents:
 
 ### 1. Universal AI Onboarding (`AGENT_CONTEXT.md`)
 A comprehensive, machine-readable repository map providing AI agents with locator strategies, test fixtures, retry policies, environment mappings, and automated troubleshooting runbooks.
 
 ### 2. Smart Predictive Test Selector (`npm run test:changed`)
-Inspects `git diff` against `main`, maps changed source files to corresponding test suites, and executes only impacted tests for lightning-fast feedback:
+Inspects `git diff` against `main`, maps changed source files to corresponding test suites, and executes only impacted tests.
+- **Fail-Safe Fallback**: If an unmapped or unknown file is modified, the selector automatically defaults to running the full test suite (`allTests: true`).
+- **Shared Dependency Mapping**: Changes to `pages/BasePage.ts`, `fixtures/`, `utils/`, or `config/` automatically trigger all test projects.
+- **Automated Unit Tests**: Verified by `tests/unit/smart-test-selector.spec.ts`.
+
 ```bash
-# Dry run: view affected projects and spec files
+# Dry run: preview affected projects and spec files
 npm run test:changed:list
 
 # Execute targeted tests immediately
@@ -79,15 +84,23 @@ npm run test:changed
 ```
 
 ### 3. Zero-Touch Defect Triage & Reporter (`npm run report:bug`)
-Automatically parses Playwright test-results, captures failed step traces, extracts error call stacks, locates failure screenshots, and synthesizes standard GitHub / Jira Markdown defect tickets:
+Extracts confirmed test failure data directly from Playwright's JSON report (`test-results/report.json`) or verified failure directories (`*-failed`).
+- **Zero False-Positives**: If all tests pass, reports clean execution and avoids generating fabricated defects.
+- **Automated Artifact Extraction**: Captures real spec file, line number, stack trace, screenshot, trace ZIP, and video into structured GitHub Markdown or Jira format.
+
 ```bash
+# Generate GitHub Markdown bug ticket
 npm run report:bug
+
+# Generate Jira issue markup
+npm run report:bug -- --jira
 ```
 
-### 4. OpenAPI Requirements RAG Engine (`npm run rag:generate-fixtures`)
-Generates schema-compliant synthetic mock datasets and request bodies from OpenAPI / Swagger specifications:
+### 4. OpenAPI-Driven API Client Generator (`npm run api:generate-fixtures`)
+Ingests OpenAPI specifications, validates schema structure, and synthesizes strongly typed TypeScript payload interfaces and Playwright API client methods:
+
 ```bash
-npm run rag:generate-fixtures
+npm run api:generate-fixtures
 ```
 
 ---
@@ -97,16 +110,19 @@ npm run rag:generate-fixtures
 To enforce code health and maintainability across team members and automated PR checks:
 
 ```bash
-# Runs full TypeScript typecheck + validates predictive test selector mapping
+# Runs full TypeScript typecheck + Unit test suite + Predictive selector validation
 npm run quality:gate
 
 # Typecheck only (Strict mode, noEmit)
 npm run typecheck
+
+# Run unit tests only
+npm run test:unit
 ```
 
 - **Type Safety**: Strictly typed Page Object models, custom fixtures, and environment configuration (`0 errors` on `tsc --noEmit`).
 - **Deterministic Waits**: Zero arbitrary `waitForTimeout` calls in production flows; all asynchronous UI states are guarded by explicit locator conditions (`waitFor({ state: 'visible' })`) and polling helpers (`waitForOrderInPending`).
-- **Test Isolation**: Each test run generates unique order numbers and handles cart cleanup. Cross-app E2E tests run sequentially to prevent cart collisions.
+- **Test Isolation**: Each test run generates unique order numbers and handles cart cleanup. Cross-app E2E tests run sequentially in a dedicated CI job to prevent cart collisions.
 
 ---
 
@@ -121,9 +137,9 @@ npm run typecheck
    - Allure reports deployed to GitHub Pages display only sanitized application UI screenshots, synthesized order numbers, and framework execution metrics.
    - For private or regulated enterprise environments, GitHub Pages access can be scoped to internal organization members via GitHub Enterprise repository settings.
 
-3. **Zero Secrets in Code**:
+3. **Zero Secrets in Code (Fail-Fast Enforcement)**:
    - `config/environment.ts` reads credentials strictly from environment variables without hardcoded fallback strings.
-   - All CI execution uses GitHub Action repository secrets.
+   - Enforces a strict fail-fast check: in CI or execution environments, missing credentials throw a descriptive error immediately.
 
 ---
 
@@ -149,16 +165,16 @@ flowchart TD
     C --> D[Phase 3: allure-report & deploy-report]
     subgraph Phase3 [Phase 3: Allure Aggregation & Deploy]
         D1[Merge Allure Results]
-        D2[Restore Trend History]
-        D3[Generate HTML Report]
-        D4[Deploy to GitHub Pages]
+        D2[Restore History from Cache]
+        D3[Generate HTML Report with Trends]
+        D4[Persist History & Deploy Pages]
     end
     D --> D1 --> D2 --> D3 --> D4
     
-    B --> E[Phase 4: Docker Container Test]
+    B --> E[Phase 4: Docker Smoke Test]
     subgraph Phase4 [Phase 4: Container Verification]
         E1[Build Image playwright-huzeif:ci]
-        E2[Run Isolated Admin Project in Container]
+        E2[Run Admin Smoke Test in Container]
     end
     E --> E1 --> E2
     
@@ -175,21 +191,23 @@ flowchart TD
 
 1. **Phase 1: `test` Matrix (3 Parallel Jobs)**:
    - Matrix runs `ordering`, `admin`, and `fulfillment` in parallel on `ubuntu-24.04`.
-   - Runs pre-execution TypeScript verification (`npm run typecheck`).
+   - Enforces pre-execution Quality Gate (`npm run quality:gate`: strict typecheck + unit tests + selector validation).
    - Uploads scoped artifacts: `playwright-report-<project>` and `allure-results-<project>`.
 
 2. **Phase 2: `e2e-bridge` (Dedicated Sequential Runner)**:
-   - Configured with `needs: test` to execute **after** storefront tests finish.
+   - Configured with `needs: test` to execute **after** standalone storefront tests finish.
    - Guarantees zero cart conflicts on the shared test user account between standalone storefront tests and cross-app E2E journeys.
 
-3. **Phase 3: `allure-report` & `deploy-report`**:
+3. **Phase 3: `allure-report` & `deploy-report` (Trend History Lifecycle)**:
    - Downloads and combines all `allure-results-*` artifacts from all projects.
-   - Restores historical run trends (`allure-history`) via GitHub Actions cache.
-   - Generates a unified Allure report and publishes it to GitHub Pages on non-PR runs (`https://<username>.github.io/<repo>/`).
+   - Restores previous history from GitHub Actions cache (`allure-history`) into `allure-results/history`.
+   - Generates unified Allure report with historical trend charts.
+   - Preserves updated `allure-report/history` back into cache for subsequent runs.
+   - Automatically publishes report to GitHub Pages on non-PR runs (`https://<username>.github.io/<repo>/`).
 
-4. **Phase 4: `docker` Container Verification**:
+4. **Phase 4: `docker` Container Smoke Verification**:
    - Multi-stage Docker build utilizing GitHub Actions cache (`cache-from: type=gha`).
-   - Executes containerized smoke tests (`--project=admin`) inside an isolated Linux container with host IPC optimization (`--ipc=host`).
+   - Executes containerized smoke verification (`--project=admin`) inside an isolated Linux container with host IPC optimization (`--ipc=host`) to validate container runtime integrity.
 
 5. **Phase 5: `notify` Status Dispatch**:
    - Evaluates composite status across all jobs (`test`, `e2e-bridge`, `docker`).
@@ -283,11 +301,12 @@ npm run docker:allure
 | `npm run test:admin` | Run Admin Portal tests |
 | `npm run test:fulfillment` | Run Fulfillment App operations tests |
 | `npm run test:e2e-bridge` | Run Cross-Application E2E integration bridge |
+| `npm run test:unit` | Run unit test suite (Smart selector & OpenAPI generator tests) |
 | `npm run test:changed` | Run only tests affected by recent git changes (Predictive SDET) |
 | `npm run test:changed:list` | Preview affected tests without execution |
-| `npm run report:bug` | Generate automated Markdown bug report from failed tests |
-| `npm run rag:generate-fixtures` | Synthesize API test fixtures from OpenAPI specifications |
-| `npm run quality:gate` | Run full quality gate (TypeScript typecheck + predictive selector) |
+| `npm run report:bug` | Generate automated Markdown bug report from verified test failures |
+| `npm run api:generate-fixtures` | Synthesize typed API client and interfaces from OpenAPI specifications |
+| `npm run quality:gate` | Strict quality gate (Typecheck + Unit tests + Selector validation) |
 | `npm run typecheck` | Run TypeScript validation (`tsc --noEmit`) |
 | `npm run test:headed` | Run tests with browser UI visible |
 | `npm run test:ui` | Open Playwright interactive UI mode |

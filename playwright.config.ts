@@ -29,6 +29,7 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { open: 'never' }],
+    ['json', { outputFile: 'test-results/report.json' }],
     ...(process.env.CI ? [['junit', { outputFile: 'test-results/junit.xml' }] as const] : []),
     ['allure-playwright', { resultsDir: 'allure-results' }],
   ],
@@ -112,6 +113,10 @@ export default defineConfig({
       use: {
         ...desktopChrome,
       },
+    },
+    {
+      name: 'unit',
+      testDir: './tests/unit',
     },
   ],
 });

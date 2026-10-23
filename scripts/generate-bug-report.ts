@@ -18,31 +18,10 @@ export interface BugReportData {
 }
 
 /**
- * Scans test-results for the most recent failure
- */
-export function findLatestFailure(): { dir: string; stats: fs.Stats } | null {
-  const resultsDir = path.resolve(process.cwd(), 'test-results');
-  if (!fs.existsSync(resultsDir)) return null;
-
-  const entries = fs.readdirSync(resultsDir, { withFileTypes: true });
-  const failedDirs = entries
-    .filter(e => e.isDirectory() && (e.name.includes('failed') || e.name.includes('retry') || true))
-    .map(e => ({
-      name: e.name,
-      dir: path.join(resultsDir, e.name),
-      stats: fs.statSync(path.join(resultsDir, e.name)),
-    }))
-    // Sort newest first
-    .sort((a, b) => b.stats.mtimeMs - a.stats.mtimeMs);
-
-  return failedDirs[0] || null;
-}
-
-/**
- * Classifies the failure root cause
+ * Classifies failure root cause based on error message patterns
  */
 export function classifyError(errorMsg: string): BugReportData['classification'] {
-  const lower = errorMsg.toLowerCase();
+  const lower = (errorMsg || '').toLowerCase();
   if (lower.includes('500 internal') || lower.includes('crash') || lower.includes('502 bad gateway') || lower.includes('failed to fetch')) {
     return 'APPLICATION_BUG';
   }
@@ -55,6 +34,195 @@ export function classifyError(errorMsg: string): BugReportData['classification']
   return 'ENVIRONMENT_ISSUE';
 }
 
+interface PlaywrightTestResult {
+  status: string;
+  error?: {
+    message?: string;
+    stack?: string;
+  };
+  attachments?: Array<{
+    name: string;
+    contentType: string;
+    path?: string;
+  }>;
+}
+
+interface PlaywrightTest {
+  title: string;
+  projectName?: string;
+  results: PlaywrightTestResult[];
+}
+
+interface PlaywrightSpec {
+  title: string;
+  file: string;
+  line: number;
+  tests: PlaywrightTest[];
+}
+
+interface PlaywrightSuite {
+  title: string;
+  file?: string;
+  suites?: PlaywrightSuite[];
+  specs?: PlaywrightSpec[];
+}
+
+interface PlaywrightJsonReport {
+  suites?: PlaywrightSuite[];
+  errors?: any[];
+}
+
+/**
+ * Recursively parses Playwright suites in report.json to find genuine failed tests
+ */
+function findFailedTestsFromReport(report: PlaywrightJsonReport): Array<{
+  title: string;
+  specPath: string;
+  line: number;
+  project: string;
+  errorMsg: string;
+  attachments: { screenshot?: string; trace?: string; video?: string };
+}> {
+  const failed: Array<{
+    title: string;
+    specPath: string;
+    line: number;
+    project: string;
+    errorMsg: string;
+    attachments: { screenshot?: string; trace?: string; video?: string };
+  }> = [];
+
+  function traverseSuite(suite: PlaywrightSuite, currentFile?: string) {
+    const file = suite.file || currentFile || '';
+    if (suite.specs) {
+      for (const spec of suite.specs) {
+        for (const test of spec.tests) {
+          for (const res of test.results) {
+            if (res.status === 'unexpected' || res.status === 'timedOut' || res.status === 'failed') {
+              const attachments = {
+                screenshot: res.attachments?.find(a => a.contentType.includes('image') || a.name === 'screenshot')?.path,
+                trace: res.attachments?.find(a => a.name === 'trace' || (a.path && a.path.endsWith('.zip')))?.path,
+                video: res.attachments?.find(a => a.contentType.includes('video') || (a.path && a.path.endsWith('.webm')))?.path,
+              };
+
+              failed.push({
+                title: `${spec.title} › ${test.title}`,
+                specPath: spec.file || file,
+                line: spec.line,
+                project: test.projectName || 'default',
+                errorMsg: res.error?.stack || res.error?.message || 'Unknown test failure',
+                attachments,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    if (suite.suites) {
+      for (const child of suite.suites) {
+        traverseSuite(child, file);
+      }
+    }
+  }
+
+  if (report.suites) {
+    for (const suite of report.suites) {
+      traverseSuite(suite);
+    }
+  }
+
+  return failed;
+}
+
+/**
+ * Scans test-results directories for actual failed artifacts (ending in -failed or -retry)
+ */
+export function findLatestFailedDirectory(): { dir: string; name: string; files: string[] } | null {
+  const resultsDir = path.resolve(process.cwd(), 'test-results');
+  if (!fs.existsSync(resultsDir)) return null;
+
+  const entries = fs.readdirSync(resultsDir, { withFileTypes: true });
+  const failedDirs = entries
+    .filter(e => e.isDirectory() && (e.name.endsWith('-failed') || e.name.includes('-retry')))
+    .map(e => ({
+      name: e.name,
+      dir: path.join(resultsDir, e.name),
+      stats: fs.statSync(path.join(resultsDir, e.name)),
+      files: fs.readdirSync(path.join(resultsDir, e.name)),
+    }))
+    .sort((a, b) => b.stats.mtimeMs - a.stats.mtimeMs);
+
+  return failedDirs[0] || null;
+}
+
+/**
+ * Extracts confirmed bug data from real Playwright execution artifacts
+ */
+export function extractRealFailure(): BugReportData | null {
+  // 1. Try parsing structured JSON report if generated
+  const reportPath = path.resolve(process.cwd(), 'test-results/report.json');
+  if (fs.existsSync(reportPath)) {
+    try {
+      const json: PlaywrightJsonReport = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+      const failures = findFailedTestsFromReport(json);
+      if (failures.length > 0) {
+        const f = failures[0];
+        const classification = classifyError(f.errorMsg);
+        return {
+          title: f.title,
+          project: f.project,
+          specPath: f.specPath,
+          line: f.line,
+          classification,
+          errorMessage: f.errorMsg,
+          reproCommand: `npx playwright test ${f.specPath}${f.line ? ':' + f.line : ''} --project=${f.project} --headed`,
+          steps: [
+            `Initialize session and authentication for ${f.project}.`,
+            `Execute test scenario defined in ${f.specPath}.`,
+            `Failure encountered at line ${f.line}.`,
+          ],
+          expected: 'Test assertions pass and target UI interaction completes without error.',
+          actual: f.errorMsg.split('\n')[0] || 'Assertion failure or execution timeout.',
+          screenshotPath: f.attachments.screenshot,
+          tracePath: f.attachments.trace,
+          videoPath: f.attachments.video,
+        };
+      }
+    } catch {
+      // Fallback to directory inspection if JSON parse fails
+    }
+  }
+
+  // 2. Fallback: inspect verified failed directories
+  const failedDir = findLatestFailedDirectory();
+  if (failedDir) {
+    const screenshot = failedDir.files.find(f => f.endsWith('.png'));
+    const trace = failedDir.files.find(f => f.endsWith('.zip'));
+    const video = failedDir.files.find(f => f.endsWith('.webm'));
+    const errorSnippet = `Automated execution failed in artifact folder: ${failedDir.name}`;
+
+    return {
+      title: `Execution failure in ${failedDir.name}`,
+      project: failedDir.name.includes('ordering') ? 'ordering' : failedDir.name.includes('admin') ? 'admin' : failedDir.name.includes('e2e') ? 'e2e-bridge' : 'fulfillment',
+      specPath: 'Identified from test-results artifact',
+      classification: classifyError(errorSnippet),
+      errorMessage: errorSnippet,
+      reproCommand: `npx playwright test --project=${failedDir.name.includes('e2e') ? 'e2e-bridge' : 'fulfillment'} --headed`,
+      steps: [
+        'Review attached trace and screenshot artifacts to reproduce failed steps.',
+      ],
+      expected: 'Test action succeeds without exceeding timeout threshold.',
+      actual: 'Execution generated failure artifacts in test-results directory.',
+      screenshotPath: screenshot ? path.join('test-results', failedDir.name, screenshot) : undefined,
+      tracePath: trace ? path.join('test-results', failedDir.name, trace) : undefined,
+      videoPath: video ? path.join('test-results', failedDir.name, video) : undefined,
+    };
+  }
+
+  return null;
+}
+
 /**
  * Generates GitHub-flavored Markdown
  */
@@ -65,11 +233,11 @@ export function formatGitHubMarkdown(data: BugReportData): string {
 - **Classification:** \`${data.classification}\`
 - **Spec:** \`${data.specPath}${data.line ? ':' + data.line : ''}\`
 - **Environment:** Dev (\`ftx.dev.ftxcommerce.com\`)
-- **Reported By:** Automated SDET Bug Reporter
+- **Reported By:** Automated SDET Bug Reporter (Playwright Real Run Metadata)
 
 ---
 
-#### 🔁 Quick Reproduction Command
+#### 🔁 Reproduction Command
 \`\`\`bash
 ${data.reproCommand}
 \`\`\`
@@ -112,7 +280,7 @@ export function formatJiraMarkup(data: BugReportData): string {
 * *Spec:* {{${data.specPath}${data.line ? ':' + data.line : ''}}}
 * *Environment:* Dev (ftx.dev.ftxcommerce.com)
 
-h3. 🔁 Quick Reproduction Command
+h3. 🔁 Reproduction Command
 {code:bash}
 ${data.reproCommand}
 {code}
@@ -139,59 +307,20 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const isJira = args.includes('--jira');
 
-  const latest = findLatestFailure();
-  let bugData: BugReportData;
+  const failure = extractRealFailure();
 
-  if (latest) {
-    const files = fs.readdirSync(latest.dir);
-    const screenshot = files.find(f => f.endsWith('.png'));
-    const trace = files.find(f => f.endsWith('.zip'));
-    const video = files.find(f => f.endsWith('.webm'));
-
-    const errorSnippet = `Timeout exceeded in directory: ${path.basename(latest.dir)}`;
-    const classification = classifyError(errorSnippet);
-
-    bugData = {
-      title: `Automated test failed in ${path.basename(latest.dir).split('-')[0]}`,
-      project: path.basename(latest.dir).includes('e2e') ? 'e2e-bridge' : 'fulfillment',
-      specPath: 'tests/e2e-bridge/physical-gift-card-lifecycle.spec.ts',
-      classification,
-      errorMessage: errorSnippet,
-      reproCommand: `npx playwright test tests/e2e-bridge/physical-gift-card-lifecycle.spec.ts --headed`,
-      steps: [
-        'Authenticate as customer & fulfillment user using saved storage states.',
-        'Execute automated test flow steps.',
-        'Observe failure point during element interaction.',
-      ],
-      expected: 'Target UI element is interactable and state transition completes successfully.',
-      actual: 'Action timed out or assertion failed during execution.',
-      screenshotPath: screenshot ? path.join('test-results', path.basename(latest.dir), screenshot) : undefined,
-      tracePath: trace ? path.join('test-results', path.basename(latest.dir), trace) : undefined,
-      videoPath: video ? path.join('test-results', path.basename(latest.dir), video) : undefined,
-    };
-  } else {
-    // Demonstration template if no recent failure exists
-    bugData = {
-      title: 'Quasar skeleton loader overlay intercepted picking submission button',
-      project: 'fulfillment',
-      specPath: 'tests/fulfillment/fulfillment-pending-orders.spec.ts',
-      line: 48,
-      classification: 'TIMEOUT_LATENCY',
-      errorMessage: 'locator.click: Timeout 30000ms exceeded waiting for locator(".q-btn:has-text(\\"Submit\\")")',
-      reproCommand: 'npx playwright test tests/fulfillment/fulfillment-pending-orders.spec.ts --project=fulfillment --headed',
-      steps: [
-        'Log in to Fulfillment portal at https://ftx.fulfillment.dev.ftxcommerce.com/',
-        'Open Pending Orders tab and select an order.',
-        'Attempt to click "Submit" while order items are fetching in background.',
-      ],
-      expected: 'Submit button receives click event and transitions order to In Progress.',
-      actual: 'Click was intercepted by parent transparent skeleton loader backdrop.',
-      screenshotPath: 'test-results/pending-orders-failed.png',
-      tracePath: 'test-results/trace.zip',
-    };
+  if (!failure) {
+    console.log('\n==================================================');
+    console.log('✅ SDET BUG REPORTER — Clean Execution Summary');
+    console.log('==================================================');
+    console.log('No failed tests detected in test-results or report.json.');
+    console.log('All tests passed or no execution failures were recorded.');
+    console.log('Zero false-positive defect reports were generated.');
+    console.log('==================================================\n');
+    process.exit(0);
   }
 
-  const output = isJira ? formatJiraMarkup(bugData) : formatGitHubMarkdown(bugData);
+  const output = isJira ? formatJiraMarkup(failure) : formatGitHubMarkdown(failure);
 
   const outDir = path.resolve(process.cwd(), 'bug-reports');
   if (!fs.existsSync(outDir)) {
@@ -208,4 +337,3 @@ if (require.main === module) {
   console.log(output);
   console.log('==================================================\n');
 }
-

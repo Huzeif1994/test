@@ -54,8 +54,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Type check
-        run: npm run typecheck
+      - name: Enforce Quality Gate (Typecheck + Unit Tests + Mapping Validation)
+        run: npm run quality:gate
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
@@ -145,17 +145,35 @@ jobs:
           merge-multiple: true
           path: allure-results
 
-      # Pichhle runs ki history (trends ke liye). Pehli baar na mile to koi dikkat nahi.
-      - name: Restore Allure history
+      # Restore historical run trends from previous GitHub Actions cache
+      - name: Restore previous Allure history
         uses: actions/cache@v4
         with:
-          path: allure-history.jsonl
+          path: allure-history
           key: allure-history-${{ github.run_id }}
           restore-keys: |
             allure-history-
 
+      - name: Inject previous history into Allure results
+        run: |
+          if [ -d "allure-history" ] && [ "$(ls -A allure-history 2>/dev/null)" ]; then
+            echo "Restoring previous Allure history to allure-results/history..."
+            mkdir -p allure-results/history
+            cp -r allure-history/* allure-results/history/
+          else
+            echo "No previous Allure history found. Starting new trend line."
+          fi
+
       - name: Generate Allure report
         run: npx allure generate allure-results -o allure-report
+
+      - name: Persist generated history for future runs
+        run: |
+          if [ -d "allure-report/history" ]; then
+            echo "Preserving allure-report/history into allure-history cache directory..."
+            mkdir -p allure-history
+            cp -r allure-report/history/* allure-history/
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -187,9 +205,9 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  # Job 4: Docker image build + usi mein tests
+  # Job 4: Docker Smoke Verification (Isolated Container Runtime)
   docker:
-    name: Docker build & test
+    name: Docker Smoke Test (Admin Portal)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
