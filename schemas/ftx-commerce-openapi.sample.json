@@ -1,0 +1,144 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FTX Commerce API",
+    "version": "1.0.0",
+    "description": "Enterprise OpenAPI specification for FTX Commerce Storefront, Gift Cards, and Fulfillment services."
+  },
+  "servers": [
+    {
+      "url": "https://ftx.dev.ftxcommerce.com/api/v1",
+      "description": "Dev Environment"
+    }
+  ],
+  "paths": {
+    "/cart/items": {
+      "post": {
+        "operationId": "addToCart",
+        "summary": "Add item or gift card to customer cart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sku": { "type": "string" },
+                  "quantity": { "type": "integer", "default": 1 },
+                  "amount": { "type": "number", "default": 25.0 }
+                },
+                "required": ["sku", "quantity"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Item added to cart" }
+        }
+      }
+    },
+    "/orders/checkout": {
+      "post": {
+        "operationId": "checkoutOrder",
+        "summary": "Submit order checkout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "paymentMethod": { "type": "string", "example": "CREDIT_CARD" },
+                  "shippingAddress": { "type": "string" }
+                },
+                "required": ["paymentMethod"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order placed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": { "type": "string" },
+                    "confirmationCode": { "type": "string" },
+                    "status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gift-cards/{id}/status": {
+      "get": {
+        "operationId": "getGiftCardStatus",
+        "summary": "Check status of a customer gift card",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gift card status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cardNumber": { "type": "string" },
+                    "cardType": { "type": "string", "enum": ["Physical", "Digital"] },
+                    "status": { "type": "string", "enum": ["Active", "Pending_Fulfillment", "Inactive"] },
+                    "balance": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fulfillment/orders/{orderId}/handover": {
+      "post": {
+        "operationId": "fulfillHandover",
+        "summary": "Complete fulfillment handover for an order",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "barcode": { "type": "string" },
+                  "handedOverBy": { "type": "string" }
+                },
+                "required": ["barcode"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Order marked fulfilled" }
+        }
+      }
+    }
+  }
+}
+

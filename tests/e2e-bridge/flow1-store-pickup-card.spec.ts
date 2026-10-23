@@ -19,7 +19,7 @@ import { StorePickupDetailPage } from '../../pages/fulfillment/detail/StorePicku
 test.describe('E2E Flow 1: In-Store Pickup with Credit Card & Handover Completion', () => {
   test('Customer places In-Store Pickup order with Credit Card -> Fulfillment picks, marks Ready, enters Confirmation Code -> Order fulfilled @bridge @flow1', async ({
     browser,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(360_000); // 6 minutes for full cross-app lifecycle
 
     await allure.epic('Cross-App E2E Integration');
@@ -31,6 +31,7 @@ test.describe('E2E Flow 1: In-Store Pickup with Credit Card & Handover Completio
     let confirmationCode = '';
     const isHeaded = process.argv.some(arg => arg.includes('--headed') || arg.includes('--ui') || arg === '-h') || process.env.HEADED === 'true';
     const desktopViewport = isHeaded ? null : { width: 1366, height: 768 };
+    const recordVideoConfig = testInfo.project.use.video === 'on' ? { dir: testInfo.outputDir } : undefined;
 
     // Register network interceptor to capture confirmation code from API responses
     const listenForConfirmationCode = (targetPage: Page) => {
@@ -66,6 +67,7 @@ test.describe('E2E Flow 1: In-Store Pickup with Credit Card & Handover Completio
       storageState: '.auth/ordering.json',
       baseURL: config.ordering.baseUrl,
       viewport: desktopViewport,
+      recordVideo: recordVideoConfig,
     });
     const customerPage = await customerContext.newPage();
     await maximizeWindow(customerPage);
@@ -112,6 +114,7 @@ test.describe('E2E Flow 1: In-Store Pickup with Credit Card & Handover Completio
       storageState: '.auth/fulfillment.json',
       baseURL: config.fulfillment.baseUrl,
       viewport: desktopViewport,
+      recordVideo: recordVideoConfig,
     });
     const fulfillmentPage = await fulfillmentContext.newPage();
     await maximizeWindow(fulfillmentPage);
@@ -259,8 +262,23 @@ test.describe('E2E Flow 1: In-Store Pickup with Credit Card & Handover Completio
       }
     });
 
+    const customerVideo = customerPage.video();
+    const fulfillmentVideo = fulfillmentPage.video();
     await customerContext.close();
     await fulfillmentContext.close();
+
+    if (customerVideo) {
+      const customerVideoPath = await customerVideo.path().catch(() => null);
+      if (customerVideoPath) {
+        await testInfo.attach('flow1-customer-ordering-video', { path: customerVideoPath, contentType: 'video/webm' });
+      }
+    }
+    if (fulfillmentVideo) {
+      const fulfillmentVideoPath = await fulfillmentVideo.path().catch(() => null);
+      if (fulfillmentVideoPath) {
+        await testInfo.attach('flow1-fulfillment-handover-video', { path: fulfillmentVideoPath, contentType: 'video/webm' });
+      }
+    }
   });
 });
 

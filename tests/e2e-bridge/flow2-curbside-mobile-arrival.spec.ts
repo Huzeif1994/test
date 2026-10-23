@@ -19,7 +19,7 @@ import { StorePickupDetailPage } from '../../pages/fulfillment/detail/StorePicku
 test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle Arrival', () => {
   test('Customer places Curbside order -> Mobile View vehicle arrival -> Fulfillment verifies Spot & Car Info -> Handover to Fulfilled @bridge @flow2', async ({
     browser,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(420_000); // 7 minutes for full curbside & arrival lifecycle
 
     await allure.epic('Cross-App E2E Integration');
@@ -31,6 +31,7 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
     let confirmationCode = '';
     const isHeaded = process.argv.some(arg => arg.includes('--headed') || arg.includes('--ui') || arg === '-h') || process.env.HEADED === 'true';
     const desktopViewport = isHeaded ? null : { width: 1366, height: 768 };
+    const recordVideoConfig = testInfo.project.use.video === 'on' ? { dir: testInfo.outputDir } : undefined;
 
     // Register network interceptor to capture confirmation code from API responses
     const listenForConfirmationCode = (targetPage: Page) => {
@@ -66,6 +67,7 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
       storageState: '.auth/ordering.json',
       baseURL: config.ordering.baseUrl,
       viewport: desktopViewport,
+      recordVideo: recordVideoConfig,
     });
     const customerPage = await customerContext.newPage();
     await maximizeWindow(customerPage);
@@ -112,6 +114,7 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
       storageState: '.auth/fulfillment.json',
       baseURL: config.fulfillment.baseUrl,
       viewport: desktopViewport,
+      recordVideo: recordVideoConfig,
     });
     const fulfillmentPage = await fulfillmentContext.newPage();
     await maximizeWindow(fulfillmentPage);
@@ -213,6 +216,7 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
         ...devices['Pixel 5'],
         storageState: '.auth/ordering.json',
         baseURL: config.ordering.baseUrl,
+        recordVideo: recordVideoConfig,
       });
       const mobilePage = await mobileContext.newPage();
       listenForConfirmationCode(mobilePage);
@@ -232,7 +236,14 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
       if (currentCode) confirmationCode = currentCode;
       console.log('Flow 2: Confirmed customer pickup code:', confirmationCode);
 
+      const mobileVideo = mobilePage.video();
       await mobileContext.close();
+      if (mobileVideo) {
+        const mobileVideoPath = await mobileVideo.path().catch(() => null);
+        if (mobileVideoPath) {
+          await testInfo.attach('flow2-mobile-arrival-video', { path: mobileVideoPath, contentType: 'video/webm' });
+        }
+      }
     });
 
     // ─────────────────────────────────────────────────────────────
@@ -290,8 +301,23 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
       }
     });
 
+    const customerVideo = customerPage.video();
+    const fulfillmentVideo = fulfillmentPage.video();
     await customerContext.close();
     await fulfillmentContext.close();
+
+    if (customerVideo) {
+      const customerVideoPath = await customerVideo.path().catch(() => null);
+      if (customerVideoPath) {
+        await testInfo.attach('flow2-customer-checkout-video', { path: customerVideoPath, contentType: 'video/webm' });
+      }
+    }
+    if (fulfillmentVideo) {
+      const fulfillmentVideoPath = await fulfillmentVideo.path().catch(() => null);
+      if (fulfillmentVideoPath) {
+        await testInfo.attach('flow2-fulfillment-handover-video', { path: fulfillmentVideoPath, contentType: 'video/webm' });
+      }
+    }
   });
 });
 

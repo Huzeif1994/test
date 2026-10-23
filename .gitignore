@@ -12,6 +12,10 @@ allure-results/
 allure-report/
 allure-history.jsonl
 
+# Generated Bug Reports
+bug-reports/*
+!bug-reports/.gitkeep
+
 # Secrets
 .env
 .env.*

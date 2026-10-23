@@ -32,25 +32,32 @@ export class PendingOrdersPage extends BaseOrdersPage {
   }
 
   /**
+   * Switch the Brand Store filter in Fulfillment (e.g. 'All Brands' or 'smokers choice')
+   */
+  async selectBrandStore(brandName: string = 'All Brands'): Promise<void> {
+    await this.expectTableLoaded();
+    const filter = this.page.locator('label:has-text("Select Brand Store"), .select-ellipsis').first();
+    if (await filter.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await filter.click();
+      await this.page.waitForTimeout(600);
+      const option = this.page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item')
+        .filter({ hasText: new RegExp(`^\\s*${brandName}\\s*$`, 'i') })
+        .first();
+      if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await option.click();
+        await this.expectTableLoaded();
+        await this.page.waitForTimeout(1000);
+      } else {
+        await this.page.keyboard.press('Escape');
+      }
+    }
+  }
+
+  /**
    * Interact with Brand Store Filter dropdown
    */
   async testBrandStoreFilter(): Promise<void> {
-    await this.expectTableLoaded();
-    const filter = this.page.locator('label:has-text("Select Brand Store"), .select-ellipsis').first();
-    if (await filter.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await filter.click();
-      await this.page.waitForTimeout(500);
-      const menu = this.page.locator('.q-menu').first();
-      if (await menu.isVisible({ timeout: 2000 }).catch(() => false)) {
-        const option = menu.locator('.q-item').first();
-        if (await option.isVisible().catch(() => false)) {
-          await option.click();
-          await this.expectTableLoaded();
-          return;
-        }
-      }
-      await this.page.keyboard.press('Escape');
-    }
+    await this.selectBrandStore('All Brands');
   }
 
   /**

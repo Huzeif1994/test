@@ -53,7 +53,7 @@ export class StorePickupDetailPage extends BasePage {
     // Now on /store-pickup, click CONTINUE / Mark Fulfilled
     const continueBtn = this.page.locator('button:has-text("CONTINUE"), button:has-text("Mark Fulfilled")').first();
     if (await continueBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await continueBtn.click();
+      await continueBtn.click({ force: true });
       await this.page.waitForTimeout(1000);
     }
   }
@@ -108,6 +108,18 @@ export class StorePickupDetailPage extends BasePage {
     const dialog = this.page.locator('.q-dialog').filter({
       hasText: /Confirmation Code|Verify/i,
     }).first();
+
+    // If dialog hasn't opened yet, click CONTINUE again (handles Vue hydration race)
+    for (let retry = 0; retry < 4; retry++) {
+      if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) break;
+      const continueBtn = this.page.locator('button:has-text("CONTINUE"), button:has-text("Mark Fulfilled")').first();
+      if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        console.log(`Fulfillment Handover: Retrying CONTINUE click for dialog (attempt ${retry + 1}/4)...`);
+        await continueBtn.click({ force: true });
+        await this.page.waitForTimeout(1500);
+      }
+    }
+
     await dialog.waitFor({ state: 'visible', timeout: 15000 });
 
     // Handle manual DOB fallback if age verification is also required

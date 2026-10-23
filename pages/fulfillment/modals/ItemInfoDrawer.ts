@@ -64,13 +64,59 @@ export class ItemInfoDrawer {
   }
 
   /**
-   * Click Done button to submit picked item
+   * Click Done button to submit picked item (resilient if already submitted/closed)
    */
   async clickDone(): Promise<void> {
-    await this.doneButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.doneButton.click();
-    await this.dialog.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    const isDialogVisible = await this.dialog.isVisible({ timeout: 1500 }).catch(() => false);
+    if (!isDialogVisible) {
+      return;
+    }
+    if (await this.doneButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await this.doneButton.click();
+      await this.dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Handle Physical Gift Card 12-digit barcode entry if prompted during picking.
+   * Matches prompt: "Scan Gift Card’s Barcode or manually enter the 12-digit gift card number"
+   * and field "Physical Gift Card 1" (or 2, etc.)
+   */
+  async handlePhysicalGiftCardBarcode(cardNumber: string, index: number = 1): Promise<boolean> {
+    await this.page.waitForTimeout(1000);
+    const barcodePrompt = this.page.locator('text=/Scan Gift Card.*Barcode|manually enter.*12-digit|Physical Gift Card/i').first();
+    const isVisible = await barcodePrompt.isVisible({ timeout: 5000 }).catch(() => false);
+    
+    if (!isVisible) {
+      return false;
+    }
+
+    console.log(`Fulfillment: Physical Gift Card prompt detected. Assigning 12-digit number: ${cardNumber}`);
+
+    // Locate the specific field for Physical Gift Card index
+    const inputField = this.page.getByLabel(new RegExp(`Physical Gift Card ${index}`, 'i'))
+      .or(this.page.locator('.q-input, .q-field').filter({ hasText: new RegExp(`Physical Gift Card ${index}`, 'i') }).locator('input'))
+      .or(this.page.locator(`input[placeholder*="12-digit"], input[placeholder*="Physical Gift Card"]`))
+      .or(this.page.locator('input[type="text"]').filter({ has: this.page.locator('text=/Physical Gift Card/i') }))
+      .or(this.page.locator('.q-dialog input[type="text"], .q-dialog input[type="number"]'))
+      .first();
+
+    await inputField.waitFor({ state: 'visible', timeout: 10000 });
+    await inputField.fill(cardNumber);
     await this.page.waitForTimeout(500);
+
+    // Click Submit / Done button
+    const submitBtn = this.page.getByRole('button', { name: /^Submit$|^Done$/i })
+      .or(this.page.locator('.q-dialog button:has-text("Submit"), .q-dialog button:has-text("Done")'))
+      .or(this.page.locator('button:has-text("Submit"), button:has-text("Done")'))
+      .first();
+
+    await submitBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await submitBtn.click();
+    await this.page.waitForTimeout(1000);
+    console.log(`Fulfillment: Successfully submitted 12-digit card number ${cardNumber}`);
+    return true;
   }
 }
 

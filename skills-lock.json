@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "automate-manual-test-cases": {
+      "source": "testomatio/skills",
+      "sourceType": "github",
+      "skillPath": "skills/automate-manual-test-cases/SKILL.md",
+      "computedHash": "11b7b5792c77cebc5b475d4b5c4ad5883424e2137a0d456ed14c09b8def9152c"
+    },
+    "debug-fix-failed-flaky-autotests": {
+      "source": "testomatio/skills",
+      "sourceType": "github",
+      "skillPath": "skills/debug-fix-failed-flaky-autotests/SKILL.md",
+      "computedHash": "e784b8d16a8ed67bd532d54dc40e03328de0dc93ca41a53f2ddbf3dd6fb51df8"
+    },
+    "testing-workflow": {
+      "source": "testomatio/skills",
+      "sourceType": "github",
+      "skillPath": "skills/testing-workflow/SKILL.md",
+      "computedHash": "bd075f0e864c07795fb833614497f7842adc1f41482f4ee6181f0c218142f681"
+    },
+    "testomatio-mcp": {
+      "source": "testomatio/skills",
+      "sourceType": "github",
+      "skillPath": "skills/testomatio-mcp/SKILL.md",
+      "computedHash": "ee1cd530608d92f80b5eb42308b2067a7e500dad8e72dfc778c66beaaaa3de21"
+    }
+  }
+}

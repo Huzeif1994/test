@@ -10,6 +10,10 @@
     "test:e2e-bridge": "playwright test --project=e2e-bridge",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
+    "test:changed": "tsx scripts/smart-test-selector.ts --run",
+    "test:changed:list": "tsx scripts/smart-test-selector.ts",
+    "report:bug": "tsx scripts/generate-bug-report.ts",
+    "rag:generate-fixtures": "tsx scripts/rag/generate-api-fixtures.ts",
     "typecheck": "tsc --noEmit",
     "report": "playwright show-report",
     "docker:build": "docker compose build",
@@ -30,6 +34,7 @@
     "allure": "^3.20.1",
     "allure-playwright": "^3.13.0",
     "dotenv": "^18.0.7",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
 }

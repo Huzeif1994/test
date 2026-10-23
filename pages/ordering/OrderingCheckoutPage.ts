@@ -296,7 +296,50 @@ export class OrderingCheckoutPage extends BasePage {
   }
 
   /**
-   * Handle Mobile Curbside Arrival flow:
+   * Fetch Confirmation Code for a specific order by navigating to /orders and opening VIEW DETAILS
+   */
+  async fetchConfirmationCodeFromOrdersList(orderNumber?: string): Promise<string> {
+    const originalUrl = this.page.url();
+    try {
+      console.log('Fetching Confirmation Code from Customer /orders page...');
+      await this.page.goto('/orders', { waitUntil: 'commit', timeout: 30000 });
+      await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+      await this.page.waitForTimeout(2000);
+
+      // Dismiss popups if any
+      const skipBtn = this.page.getByRole('button', { name: /^Skip$/i }).first();
+      if (await skipBtn.isVisible({ timeout: 1000 }).catch(() => false)) await skipBtn.click().catch(() => {});
+
+      // Locate the VIEW DETAILS button: either top one or within row for orderNumber
+      let viewBtn = this.page.locator('button, a').filter({ hasText: /^VIEW DETAILS$/i }).first();
+      if (orderNumber) {
+        const rowWithOrder = this.page.locator('div, li, .order-list-item')
+          .filter({ hasText: orderNumber })
+          .filter({ has: this.page.locator('button, a', { hasText: /VIEW DETAILS/i }) })
+          .first();
+        if (await rowWithOrder.isVisible({ timeout: 3000 }).catch(() => false)) {
+          viewBtn = rowWithOrder.locator('button, a').filter({ hasText: /VIEW DETAILS/i }).first();
+        }
+      }
+
+      await viewBtn.waitFor({ state: 'visible', timeout: 15000 });
+      await viewBtn.click();
+      await this.page.waitForTimeout(2500);
+
+      const bodyText = await this.page.locator('body').innerText().catch(() => '');
+      const match = bodyText.match(/confirmation code\s*[:\n\r\s]*([0-9]{4})/i) ||
+                    bodyText.match(/pickup code\s*[:\n\r\s]*([0-9]{4})/i);
+      const code = match ? match[1].trim() : '';
+      console.log('Retrieved Confirmation Code from Orders list:', code);
+      return code;
+    } finally {
+      if (originalUrl && !originalUrl.includes('/orders')) {
+        await this.page.goto(originalUrl, { waitUntil: 'commit', timeout: 30000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+      }
+    }
+  }
+
   /**
    * Handle Mobile Curbside Arrival flow:
    * Refresh -> "I'M ON MY WAY" -> Confirm -> "I AM HERE" -> Select Details -> Confirm
@@ -501,5 +544,35 @@ export class OrderingCheckoutPage extends BasePage {
 
     return result;
   }
-}
+  /**
+   * Complete the 4-step Store Pickup checkout flow for Physical items / Gift Cards:
+   * 1 of 4: Order Details -> Click Continue
+   * 2 of 4: Personal Information -> Click Continue
+   * 3 of 4: Store Pickup Information -> Click Continue
+   * 4 of 4: Payment and Billing Information -> Select Credit Card -> Accept Terms -> Place Order
+   */
+  async completeMultiStepPhysicalCheckout(): Promise<void> {
+    // 1. Wait for checkout page to hydrate (Order Details section)
+    const orderDetailsSection = this.page.locator(':has-text("Order Details")').first();
+    await orderDetailsSection.waitFor({ state: 'visible', timeout: 25000 });
+    await this.page.waitForTimeout(1000);
 
+    // Step 1 -> 2 -> 3: Click "Continue" through each step until Payment section is reached
+    for (let step = 1; step <= 3; step++) {
+      const continueBtn = this.page.getByRole('button', { name: /^Continue$/i })
+        .or(this.page.locator('button:has-text("Continue")'))
+        .first();
+
+      if (await continueBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await continueBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await continueBtn.click();
+        await this.page.waitForTimeout(1500);
+      }
+    }
+
+    // Step 4: Payment and Billing Information
+    await this.selectCreditOrDebitCard();
+    await this.acceptTerms();
+    await this.placeOrder();
+  }
+}

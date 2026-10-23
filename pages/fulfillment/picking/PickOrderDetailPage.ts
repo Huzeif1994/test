@@ -67,9 +67,9 @@ export class PickOrderDetailPage extends BasePage {
   }
 
   /**
-   * Pick all unpicked items in the table (including linked products if present)
+   * Pick all unpicked items in the table (including linked products and physical gift card barcodes)
    */
-  async pickAllItems(itemInfoDrawer: ItemInfoDrawer): Promise<void> {
+  async pickAllItems(itemInfoDrawer: ItemInfoDrawer, giftCardNumber?: string): Promise<void> {
     await this.page.waitForTimeout(1000);
     const mainRows = this.page.locator('.ftx-table__body > .ftx-table__tr');
     const count = await mainRows.count();
@@ -84,7 +84,14 @@ export class PickOrderDetailPage extends BasePage {
         await titleCell.click();
         await itemInfoDrawer.expectDrawerOpen();
         await itemInfoDrawer.selectPickedQty();
+        if (giftCardNumber) {
+          await itemInfoDrawer.handlePhysicalGiftCardBarcode(giftCardNumber);
+        }
         await itemInfoDrawer.clickDone();
+        // Check if barcode dialog opened after clicking Done
+        if (giftCardNumber) {
+          await itemInfoDrawer.handlePhysicalGiftCardBarcode(giftCardNumber);
+        }
         await this.page.waitForTimeout(600);
       }
 

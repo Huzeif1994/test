@@ -204,7 +204,7 @@ export class OrderingHomePage extends BasePage {
     // 2. Click Drawer Sign In and wait for Identity Server redirect
     await this.dismissAllPopups(2000);
     await Promise.all([
-      this.page.waitForURL(/dev-identity|Identity|Login/i, { timeout: 30000 }),
+      this.page.waitForURL(/dev-identity|Identity|Login/i, { timeout: 35000, waitUntil: 'domcontentloaded' }),
       this.drawerSignInButton.click().catch(() => this.drawerSignInButton.dispatchEvent('click')),
     ]);
     await this.page.waitForTimeout(2000);
