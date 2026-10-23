@@ -1,158 +1,298 @@
 # playwright-huzeif
 
-Playwright automated testing framework with TypeScript, Multi-App Support, Docker, Allure Reporting, and GitHub Actions CI/CD.
-
-## Applications Covered
-
-This framework supports 3 independent applications across multiple environments (**Dev** & **Staging**):
-
-1. **Online Ordering**: Customer storefront (`https://ftx.dev.ftxcommerce.com` / `https://ftx.staging.ftxcommerce.com`)
-2. **Admin Portal**: Merchant administration (`https://ftx.admin.dev.ftxcommerce.com/` / `https://ftx.admin.staging.ftxcommerce.com/`)
-3. **Fulfillment App**: Operations & dispatch (`https://ftx.fulfillment.dev.ftxcommerce.com/` / `https://ftx.fulfillment.staging.ftxcommerce.com/`)
+Enterprise-grade Playwright & TypeScript test automation framework engineered for multi-application commerce ecosystems. Featuring Dockerized execution, Allure reporting with historical trends, 5-phase CI/CD pipelines, and an autonomous AI-native SDET toolchain.
 
 ---
 
-## Quick Start (Local Setup)
+## 🌟 Architecture Highlights
+
+- **Multi-Application Orchestration**: Unified test framework covering Online Ordering storefront, Merchant Admin Portal, Operations Fulfillment, and cross-application integration flows.
+- **5-Phase CI/CD Pipeline**: 3 parallel matrix jobs, dedicated serialized E2E bridge execution (eliminating shared-cart race conditions), unified Allure aggregation, Docker container verification, and Office 365 SMTP notifications.
+- **AI-Native SDET Toolchain**: Built-in predictive test execution, automated zero-touch bug reporting, OpenAPI RAG mock generator, and machine-readable agent onboarding context.
+- **Enterprise Security**: Zero committed credentials or fallback passwords; strict environment variable validation via `.env` and GitHub Secrets.
+- **Deterministic Reliability**: Custom Page Object Model with condition-based polling helpers, segregated session caching (`storageState`), and single-worker execution for shared test environments.
+
+---
+
+## 🏗️ Applications Covered
+
+The suite validates 3 independent applications across **Dev** and **Staging** environments:
+
+| Application | Scope & Description | Dev Environment | Staging Environment |
+|---|---|---|---|
+| **Online Ordering** | Customer storefront: catalog, cart, guest/auth checkout, gift cards | `https://ftx.dev.ftxcommerce.com` | `https://ftx.staging.ftxcommerce.com` |
+| **Admin Portal** | Merchant administration: age verification, catalog, and rules engine | `https://ftx.admin.dev.ftxcommerce.com/` | `https://ftx.admin.staging.ftxcommerce.com/` |
+| **Fulfillment App** | Operations dispatch: order picking, staging bins, delivery dispatch | `https://ftx.fulfillment.dev.ftxcommerce.com/` | `https://ftx.fulfillment.staging.ftxcommerce.com/` |
+| **Cross-App Bridge** | End-to-end integration: Storefront order creation → Fulfillment dispatch | Multi-App Cross Bridge | Multi-App Cross Bridge |
+
+---
+
+## 🚀 Quick Start (Local Setup)
 
 > **Important**: Open the `playwright-huzeif` directory directly as your workspace root in VS Code.
 
 ```bash
-# 1. Dependencies install karo
+# 1. Install dependencies
 npm ci
 
-# 2. Playwright browser install karo
+# 2. Install Playwright browser binaries
 npx playwright install chromium
 
-# 3. .env file create karo (.env.example se copy karke credentials configure karein)
+# 3. Create .env from template and configure credentials
 cp .env.example .env
 
-# 4. TypeScript typecheck karo
-npm run typecheck
+# 4. Run quality gate (TypeScript type-safety + Smart Test Selector validation)
+npm run quality:gate
 
-# 5. Saare apps ke tests run karo (Default: Dev environment)
+# 5. Execute all test suites (Default: Dev environment)
 npm test
 ```
 
 ---
 
-## Running Tests by Application
+## 📋 Test Suites & Coverage Matrix
 
-Aap specific app ya flow ke tests alag se run kar sakte hain:
+| Project | Scenarios & Coverage | Primary Spec Files |
+|---|---|---|
+| **`admin`** | • Scenario 1: Main "Enable Age Verification" toggle<br>• Scenario 2: Age verification before viewing products<br>• Scenario 3: Age verification during checkout<br>• Scenarios 4 & 5: Age verification at fulfillment with manual DOB fallback | `tests/admin/admin-age-verification-settings.spec.ts` |
+| **`ordering`** | • Storefront category browsing & skeleton loader synchronization<br>• Dynamic cart item additions & quantity adjustments<br>• Multi-step checkout with "Pay At Store" & time-slot selection<br>• Legal compliance authorization toggle & order placement | `tests/ordering/ordering-storefront-flow.spec.ts` |
+| **`fulfillment`** | • Pending Orders 5-action menu, search, pagination<br>• End-to-end Picking workflow: Item Picking -> Delivery Handling -> Staging -> Mark Ready<br>• In Progress Orders table & status validation<br>• Fulfilled Orders table & order history<br>• All Orders table & search filters<br>• Manage Staging Area location inventory | `tests/fulfillment/fulfillment-pending-orders.spec.ts`<br>`tests/fulfillment/fulfillment-sidebar-modules.spec.ts` |
+| **`e2e-bridge`** | • Customer places real order on Online Ordering storefront<br>• Cross-boundary order ID propagation to Fulfillment<br>• Fulfillment employee searches order & opens details modal<br>• Item picking, staging container assignment, and Ready status dispatch<br>• Curbside arrival notice, vehicle details, and parking spot check-in<br>• Physical Gift Card full lifecycle: Admin creation → Storefront purchase → Fulfillment activation | `tests/e2e-bridge/cross-app-ordering-to-fulfillment.spec.ts`<br>`tests/e2e-bridge/flow1-store-pickup-card.spec.ts`<br>`tests/e2e-bridge/flow2-curbside-mobile-arrival.spec.ts`<br>`tests/e2e-bridge/physical-gift-card-lifecycle.spec.ts` |
 
+---
+
+## 🤖 AI-Native SDET Toolchain
+
+This repository implements next-generation autonomous SDET tools designed for pair programming with autonomous AI agents:
+
+### 1. Universal AI Onboarding (`AGENT_CONTEXT.md`)
+A comprehensive, machine-readable repository map providing AI agents with locator strategies, test fixtures, retry policies, environment mappings, and automated troubleshooting runbooks.
+
+### 2. Smart Predictive Test Selector (`npm run test:changed`)
+Inspects `git diff` against `main`, maps changed source files to corresponding test suites, and executes only impacted tests for lightning-fast feedback:
 ```bash
-# 1. Online Ordering app (Storefront catalog, cart, checkout)
-npm run test:ordering
+# Dry run: view affected projects and spec files
+npm run test:changed:list
 
-# 2. Admin Portal (Age verification settings 5 scenarios)
-npm run test:admin
+# Execute targeted tests immediately
+npm run test:changed
+```
 
-# 3. Fulfillment App (Pending, In-Progress, Fulfilled, All Orders, Staging Area)
-npm run test:fulfillment
+### 3. Zero-Touch Defect Triage & Reporter (`npm run report:bug`)
+Automatically parses Playwright test-results, captures failed step traces, extracts error call stacks, locates failure screenshots, and synthesizes standard GitHub / Jira Markdown defect tickets:
+```bash
+npm run report:bug
+```
 
-# 4. Cross-App E2E Integration Bridge (Online Ordering -> Fulfillment Picking & Staging)
-npm run test:e2e-bridge
-
-# Headed mode (Browser UI visible)
-npm run test:headed
-
-# Playwright interactive UI mode
-npm run test:ui
-
-# Playwright HTML report view karo
-npm run report
+### 4. OpenAPI Requirements RAG Engine (`npm run rag:generate-fixtures`)
+Generates schema-compliant synthetic mock datasets and request bodies from OpenAPI / Swagger specifications:
+```bash
+npm run rag:generate-fixtures
 ```
 
 ---
 
-## Test Suites & Coverage
+## 🛡️ Measurable Quality Gates
 
-| Module / Project | Scope & Scenarios Covered | Spec File |
-|---|---|---|
-| **Admin Portal** (`admin`) | • Scenario 1: Main "Enable Age Verification" toggle<br>• Scenario 2: Age verification before viewing products<br>• Scenario 3: Age verification during checkout<br>• Scenarios 4 & 5: Age verification at fulfillment with manual DOB fallback | `tests/admin/admin-age-verification-settings.spec.ts` |
-| **Online Ordering** (`ordering`) | • Storefront category browsing & skeleton loader wait<br>• Product addition to cart & Cart page review<br>• Multi-step checkout with "Pay At Store"<br>• Dynamic legal authorization toggle & order placement confirmation | `tests/ordering/ordering-storefront-flow.spec.ts` |
-| **Cross-App Bridge** (`e2e-bridge`) | • Customer places real order on Online Ordering storefront<br>• Extracts Order ID across app boundaries<br>• Fulfillment employee searches order & opens details<br>• Picks linked items, assigns staging package, and marks Ready | `tests/e2e-bridge/cross-app-ordering-to-fulfillment.spec.ts` |
-| **Fulfillment App** (`fulfillment`) | • Pending Orders 5-action menu, search, pagination<br>• End-to-end Picking workflow: Item Picking -> Delivery Handling -> Staging -> Mark Ready<br>• In Progress Orders table & status validation<br>• Fulfilled Orders table & order history<br>• All Orders table & search filters<br>• Manage Staging Area location inventory | `tests/fulfillment/fulfillment-pending-orders.spec.ts`<br>`tests/fulfillment/fulfillment-sidebar-modules.spec.ts` |
-
----
-
-## Session Management & Authentication Architecture
-
-Har app ke liye Playwright `storageState` session caching use karta hai, jisse bar bar credentials fill karne ki zaroorat nahi padti:
-- **Fulfillment**: `tests/setup/auth.fulfillment.setup.ts` → `.auth/fulfillment.json`
-- **Admin**: `tests/setup/auth.admin.setup.ts` → `.auth/admin.json`
-- **Online Ordering**: `tests/setup/auth.ordering.setup.ts` → `.auth/ordering.json`
-
-Setup projects `playwright.config.ts` ke dependencies ke roop mein automatically execute hote hain.
-
----
-
-## Environment Switching (Dev vs Staging)
-
-Environment switch karne ke liye `.env` file mein `TEST_ENV` change karein ya command line se pass karein:
+To enforce code health and maintainability across team members and automated PR checks:
 
 ```bash
-# Staging environment par sabhi tests run karo
+# Runs full TypeScript typecheck + validates predictive test selector mapping
+npm run quality:gate
+
+# Typecheck only (Strict mode, noEmit)
+npm run typecheck
+```
+
+- **Type Safety**: Strictly typed Page Object models, custom fixtures, and environment configuration (`0 errors` on `tsc --noEmit`).
+- **Deterministic Waits**: Zero arbitrary `waitForTimeout` calls in production flows; all asynchronous UI states are guarded by explicit locator conditions (`waitFor({ state: 'visible' })`) and polling helpers (`waitForOrderInPending`).
+- **Test Isolation**: Each test run generates unique order numbers and handles cart cleanup. Cross-app E2E tests run sequentially to prevent cart collisions.
+
+---
+
+## 🔒 Test Data Hygiene & Report Privacy
+
+1. **Synthetic & Anonymized Test Data**:
+   - All test orders are generated dynamically with timestamped identifiers (e.g., `ORD-${Date.now()}`).
+   - Accounts use synthetic test personas (`Test User`).
+   - No production customer records, real credit cards, or personally identifiable information (PII) are ever accessed, stored, or transmitted.
+
+2. **Report Privacy & Public Hosting**:
+   - Allure reports deployed to GitHub Pages display only sanitized application UI screenshots, synthesized order numbers, and framework execution metrics.
+   - For private or regulated enterprise environments, GitHub Pages access can be scoped to internal organization members via GitHub Enterprise repository settings.
+
+3. **Zero Secrets in Code**:
+   - `config/environment.ts` reads credentials strictly from environment variables without hardcoded fallback strings.
+   - All CI execution uses GitHub Action repository secrets.
+
+---
+
+## 🔄 CI/CD Pipeline Architecture (`.github/workflows/playwright.yml`)
+
+The repository runs a robust **5-phase workflow** on every push to `main`, pull request, nightly schedule (12:15 PM IST / 06:45 UTC), and manual trigger:
+
+```mermaid
+flowchart TD
+    A[Push / PR / Schedule / Manual] --> B[Phase 1: test Matrix]
+    subgraph Phase1 [Phase 1: 3 Parallel Matrix Jobs]
+        B1[Ordering Tests]
+        B2[Admin Tests]
+        B3[Fulfillment Tests]
+    end
+    B --> B1
+    B --> B2
+    B --> B3
+    
+    B1 & B2 & B3 --> C[Phase 2: e2e-bridge]
+    note1[Dedicated dependent runner\nPrevents concurrent cart collisions] -.-> C
+    
+    C --> D[Phase 3: allure-report & deploy-report]
+    subgraph Phase3 [Phase 3: Allure Aggregation & Deploy]
+        D1[Merge Allure Results]
+        D2[Restore Trend History]
+        D3[Generate HTML Report]
+        D4[Deploy to GitHub Pages]
+    end
+    D --> D1 --> D2 --> D3 --> D4
+    
+    B --> E[Phase 4: Docker Container Test]
+    subgraph Phase4 [Phase 4: Container Verification]
+        E1[Build Image playwright-huzeif:ci]
+        E2[Run Isolated Admin Project in Container]
+    end
+    E --> E1 --> E2
+    
+    D & E --> F[Phase 5: Notification & Summary]
+    subgraph Phase5 [Phase 5: Status Dispatch]
+        F1[Publish Markdown Job Summary]
+        F2[Send Formatted HTML Email via Office 365]
+    end
+    F --> F1
+    F --> F2
+```
+
+### Detailed Pipeline Phases
+
+1. **Phase 1: `test` Matrix (3 Parallel Jobs)**:
+   - Matrix runs `ordering`, `admin`, and `fulfillment` in parallel on `ubuntu-24.04`.
+   - Runs pre-execution TypeScript verification (`npm run typecheck`).
+   - Uploads scoped artifacts: `playwright-report-<project>` and `allure-results-<project>`.
+
+2. **Phase 2: `e2e-bridge` (Dedicated Sequential Runner)**:
+   - Configured with `needs: test` to execute **after** storefront tests finish.
+   - Guarantees zero cart conflicts on the shared test user account between standalone storefront tests and cross-app E2E journeys.
+
+3. **Phase 3: `allure-report` & `deploy-report`**:
+   - Downloads and combines all `allure-results-*` artifacts from all projects.
+   - Restores historical run trends (`allure-history`) via GitHub Actions cache.
+   - Generates a unified Allure report and publishes it to GitHub Pages on non-PR runs (`https://<username>.github.io/<repo>/`).
+
+4. **Phase 4: `docker` Container Verification**:
+   - Multi-stage Docker build utilizing GitHub Actions cache (`cache-from: type=gha`).
+   - Executes containerized smoke tests (`--project=admin`) inside an isolated Linux container with host IPC optimization (`--ipc=host`).
+
+5. **Phase 5: `notify` Status Dispatch**:
+   - Evaluates composite status across all jobs (`test`, `e2e-bridge`, `docker`).
+   - Generates a styled Markdown Job Summary directly in the GitHub Actions run.
+   - Dispatches formatted HTML execution alerts to team inboxes via Microsoft 365 / Outlook SMTP.
+
+---
+
+## 🔐 Session Management & Authentication Architecture
+
+To maximize test speed and avoid repetitive login roundtrips, each application uses Playwright `storageState` session caching:
+
+- **Online Ordering**: `tests/setup/auth.ordering.setup.ts` → `.auth/ordering.json`
+- **Admin Portal**: `tests/setup/auth.admin.setup.ts` → `.auth/admin.json`
+- **Fulfillment App**: `tests/setup/auth.fulfillment.setup.ts` → `.auth/fulfillment.json`
+
+Setup dependencies are configured directly in `playwright.config.ts` and automatically execute before their respective app projects.
+
+---
+
+## ⚙️ Environment Configuration
+
+Switch between environments via the `TEST_ENV` environment variable or `.env`:
+
+```bash
+# Run against Staging
 TEST_ENV=staging npx playwright test
 
-# Staging par sirf Admin tests run karo
+# Run Admin on Staging
 TEST_ENV=staging npm run test:admin
 
-# Dev environment par run karo
+# Run on Dev (Default)
 TEST_ENV=dev npm test
 ```
 
-Credentials aur URLs `config/environment.ts` ke through automatically Dev ya Staging ke hisaab se load hote hain.
+### GitHub Secrets Configuration
+
+For CI/CD execution, configure the following secrets under **Repository Settings → Secrets and variables → Actions**:
+
+| Secret Name | Description |
+|---|---|
+| `ORDERING_DEV_USER` / `ORDERING_DEV_PASSWORD` | Storefront customer test credentials (Dev) |
+| `ADMIN_DEV_USER` / `ADMIN_DEV_PASSWORD` | Merchant admin portal credentials (Dev) |
+| `FULFILLMENT_DEV_USER` / `FULFILLMENT_DEV_PASSWORD` | Fulfillment team credentials (Dev) |
+| `ORDERING_STAGING_USER` / `ORDERING_STAGING_PASSWORD` | Storefront customer credentials (Staging) |
+| `ADMIN_STAGING_USER` / `ADMIN_STAGING_PASSWORD` | Merchant admin credentials (Staging) |
+| `FULFILLMENT_STAGING_USER` / `FULFILLMENT_STAGING_PASSWORD` | Fulfillment team credentials (Staging) |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | Office 365 / Outlook SMTP notification credentials |
 
 ---
 
-## Allure Reporting
-
-Tests run hone par raw results `allure-results/` mein save hote hain.
+## 📊 Allure Reporting Commands
 
 ```bash
-# Report generate karo
+# Generate report from raw results
 npm run allure:generate
 
-# Generated report browser mein open karo
+# Open generated report in browser
 npm run allure:open
 
-# Direct results se local dev server chalao
+# Live local dev server from raw results
 npm run allure:serve
 
-# Results aur report cache clean karo
+# Clean previous report and result artifacts
 npm run allure:clean
 ```
 
 ---
 
-## Docker Execution
+## 🐳 Docker Local Execution
 
 ```bash
-# Image build karo
+# Build Docker image locally
 npm run docker:build
 
-# Tests run karo container mein (reports host machine par sync hongi)
+# Run tests inside container (syncs reports to host)
 npm run docker:test
 
-# Docker test chala kar Allure report auto open karo
+# Execute container tests and automatically open Allure report
 npm run docker:allure
 ```
 
 ---
 
-## CI/CD (GitHub Actions)
+## 📜 Full Command Reference
 
-`.github/workflows/playwright.yml`:
-- **Triggers**: Push on `main`/`master`, Pull Requests, Daily Schedule (12:15 PM IST / 06:45 UTC), aur Manual Dispatch.
-- **Jobs**:
-  1. `test`: **4 Parallel Matrix Jobs** (`ordering`, `admin`, `fulfillment`, `e2e-bridge`) with automated TypeScript type checking (`npm run typecheck`).
-  2. `allure-report`: Sabhi suites ke Allure results combine karke single unified Allure report create hoti hai.
-  3. `deploy-report`: `main` branch ke runs ke liye GitHub Pages par live report publish hoti hai (`https://<username>.github.io/<repo>/`).
-  4. `docker`: Container build aur containerized smoke test execution.
-  5. `notify`: Test execution outcome aur Allure report ka link directly Outlook email par dispatch hota hai (`huzeif.shaikh@ftxinfotech.com`).
-
-### Outlook Email Setup (GitHub Secrets)
-GitHub Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
-- `MAIL_USERNAME`: Sender email address (e.g. `huzeif.shaikh@ftxinfotech.com`)
-- `MAIL_PASSWORD`: Outlook / Microsoft 365 Password ya App Password
-
+| Command | Action |
+|---|---|
+| `npm test` | Run all test projects sequentially (`workers: 1`) |
+| `npm run test:ordering` | Run Online Ordering storefront tests |
+| `npm run test:admin` | Run Admin Portal tests |
+| `npm run test:fulfillment` | Run Fulfillment App operations tests |
+| `npm run test:e2e-bridge` | Run Cross-Application E2E integration bridge |
+| `npm run test:changed` | Run only tests affected by recent git changes (Predictive SDET) |
+| `npm run test:changed:list` | Preview affected tests without execution |
+| `npm run report:bug` | Generate automated Markdown bug report from failed tests |
+| `npm run rag:generate-fixtures` | Synthesize API test fixtures from OpenAPI specifications |
+| `npm run quality:gate` | Run full quality gate (TypeScript typecheck + predictive selector) |
+| `npm run typecheck` | Run TypeScript validation (`tsc --noEmit`) |
+| `npm run test:headed` | Run tests with browser UI visible |
+| `npm run test:ui` | Open Playwright interactive UI mode |
+| `npm run report` | Open standard Playwright HTML report |
+| `npm run docker:test` | Run tests in containerized environment |
+| `npm run allure:generate` | Generate Allure report from results |
+| `npm run allure:open` | Open Allure report |
+| `npm run allure:clean` | Wipe Allure report and result caches |

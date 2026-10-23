@@ -22,7 +22,9 @@
     "allure:open": "allure open allure-report",
     "allure:serve": "allure serve allure-results",
     "allure:clean": "node -e \"require('fs').rmSync('allure-results',{recursive:true,force:true});require('fs').rmSync('allure-report',{recursive:true,force:true})\"",
-    "docker:allure": "node -e \"const { spawnSync } = require('child_process'); spawnSync('npm', ['run', 'docker:test'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:generate'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:open'], { stdio: 'inherit', shell: true });\""
+    "docker:allure": "node -e \"const { spawnSync } = require('child_process'); spawnSync('npm', ['run', 'docker:test'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:generate'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:open'], { stdio: 'inherit', shell: true });\"",
+    "quality:check": "tsc --noEmit && tsx scripts/smart-test-selector.ts",
+    "quality:gate": "npm run quality:check"
   },
   "keywords": [],
   "author": "",
