@@ -89,6 +89,7 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
       await fulfillmentPage.goto('/pending-order', { waitUntil: 'domcontentloaded' });
       await pendingOrdersPage.expectOnPendingPage();
       await pendingOrdersPage.expectTableLoaded();
+      await pendingOrdersPage.selectBrandStore('All Brands');
 
       if (placedOrderNumber) {
         searchKeyword = placedOrderNumber;

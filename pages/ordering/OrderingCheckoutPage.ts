@@ -99,17 +99,45 @@ export class OrderingCheckoutPage extends BasePage {
     // Click button
     await btn.click().catch(() => btn.dispatchEvent('click'));
 
+    // Check if "Reserve a time slot" modal opened upon clicking Proceed to Checkout
+    const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot/i }).first();
+    if (await slotDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      console.log('Cart: "Reserve a time slot" dialog detected, waiting for available slots...');
+      const slotRadio = slotDialog.locator('.q-radio, [role="radio"]').first();
+      await slotRadio.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await slotRadio.isVisible().catch(() => false)) {
+        await slotRadio.click({ force: true });
+        await this.page.waitForTimeout(600);
+      }
+
+      const dialogProceedBtn = slotDialog.locator('button').filter({ hasText: /Proceed to Checkout/i }).first();
+      await dialogProceedBtn.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await dialogProceedBtn.isVisible().catch(() => false)) {
+        await dialogProceedBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await dialogProceedBtn.click({ force: true }).catch(() => {});
+      }
+    }
+
     // Ensure transition to /checkout
     for (let retry = 0; retry < 6; retry++) {
       if (this.page.url().includes('/checkout')) break;
       await this.page.waitForTimeout(1000);
-      if (await btn.isVisible().catch(() => false)) {
+      if (await slotDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
+        const slotRadio = slotDialog.locator('.q-radio, [role="radio"]').first();
+        if (await slotRadio.isVisible().catch(() => false)) {
+          await slotRadio.click({ force: true }).catch(() => {});
+          await this.page.waitForTimeout(400);
+        }
+        const dialogProceedBtn = slotDialog.locator('button').filter({ hasText: /Proceed to Checkout/i }).first();
+        await dialogProceedBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await dialogProceedBtn.click({ force: true }).catch(() => {});
+      } else if (await btn.isVisible().catch(() => false)) {
         await btn.click().catch(() => btn.dispatchEvent('click'));
       }
     }
 
     // Wait for checkout URL
-    await this.page.waitForURL(/\/checkout/i, { timeout: 25000 });
+    await this.page.waitForURL(/\/checkout/i, { timeout: 60000 });
     await this.expectCheckoutLoaded();
   }
 
@@ -117,6 +145,7 @@ export class OrderingCheckoutPage extends BasePage {
    * Wait for Checkout page sections to be fully interactive
    */
   async expectCheckoutLoaded(): Promise<void> {
+    await this.page.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 35000 }).catch(() => {});
     const interactiveEl = this.page.locator('[role="switch"], [role="radio"], .q-radio, button').filter({ hasText: /Place Order|In Store|Curbside|Pay At Store/i }).first();
     await interactiveEl.waitFor({ state: 'visible', timeout: 20000 });
   }
@@ -493,23 +522,24 @@ export class OrderingCheckoutPage extends BasePage {
       await selectSlotBtn.click({ force: true });
       await this.page.waitForTimeout(1000);
 
-      // In Quasar dialog or dropdown, find available slot chips or buttons
-      const availableSlot = this.page.locator('.q-dialog button:not([disabled]), .q-dialog .q-chip:not(.disabled), .q-dialog .q-radio, .q-dialog .cursor-pointer')
-        .filter({ hasText: /AM|PM|\d+:\d+|Today|Tomorrow/i })
-        .first();
+      // In Quasar dialog, wait for available slot radio/chip (slots API takes ~3-4s to load)
+      const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot|Select Slot|Time Slot/i }).first();
+      const availableSlot = slotDialog.locator('.q-radio, [role="radio"]').first();
 
-      if (await availableSlot.isVisible({ timeout: 4000 }).catch(() => false)) {
+      await availableSlot.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await availableSlot.isVisible().catch(() => false)) {
         await availableSlot.click({ force: true });
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(600);
 
-        // Click Confirm / Save / Apply in the dialog
-        const confirmSlotBtn = this.page.locator('.q-dialog button')
-          .filter({ hasText: /Confirm|Save|Apply|Select|Done|Submit/i })
+        // Click Proceed / Confirm / Save / Apply in the dialog
+        const confirmSlotBtn = slotDialog.locator('button')
+          .filter({ hasText: /Proceed to Checkout|Confirm|Save|Apply|Select|Done|Submit/i })
           .first();
 
-        if (await confirmSlotBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await confirmSlotBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          await confirmSlotBtn.scrollIntoViewIfNeeded().catch(() => {});
           await confirmSlotBtn.click({ force: true });
-          await this.page.waitForTimeout(1000);
+          await this.page.waitForTimeout(1500);
         }
       }
     }

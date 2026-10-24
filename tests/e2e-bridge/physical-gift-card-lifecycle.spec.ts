@@ -13,6 +13,7 @@ import { PickOrderPackagePage } from '../../pages/fulfillment/picking/PickOrderP
 import { AssignStagingDrawer } from '../../pages/fulfillment/modals/AssignStagingDrawer';
 import { ReadyOrdersPage } from '../../pages/fulfillment/orders/ReadyOrdersPage';
 import { StorePickupDetailPage } from '../../pages/fulfillment/detail/StorePickupDetailPage';
+import { FulfillmentSidebar } from '../../pages/fulfillment/navigation/FulfillmentSidebar';
 
 test.describe('Physical Gift Card Lifecycle: Purchase to Fulfillment to Activation', () => {
   test('Complete Customer Purchase -> Pre-Fulfillment Verification -> Fulfillment 12-digit Barcode Assignment -> Live Activated Validation @bridge @physical-giftcard', async ({
@@ -150,6 +151,7 @@ test.describe('Physical Gift Card Lifecycle: Purchase to Fulfillment to Activati
     const assignStagingDrawer = new AssignStagingDrawer(fulfillmentPage);
     const readyOrdersPage = new ReadyOrdersPage(fulfillmentPage);
     const storePickupDetailPage = new StorePickupDetailPage(fulfillmentPage);
+    const fulfillmentSidebar = new FulfillmentSidebar(fulfillmentPage);
 
     await test.step('Step 4 & 5: Fulfillment staff locates order in Pending Orders and starts picking', async () => {
       await fulfillmentPage.goto('/pending-order', { waitUntil: 'domcontentloaded' });
@@ -192,27 +194,13 @@ test.describe('Physical Gift Card Lifecycle: Purchase to Fulfillment to Activati
       }
 
       // Step 7 Handover: Open Ready order and complete handover to transition to "Fulfilled"
-      await fulfillmentPage.goto('/all-orders', { waitUntil: 'domcontentloaded' });
-      await pendingOrdersPage.expectTableLoaded();
-      await pendingOrdersPage.selectBrandStore('All Brands');
-      await pendingOrdersPage.expectTableLoaded();
-      await pendingOrdersPage.search(placedOrderNumber);
-      await pendingOrdersPage.expectTableLoaded();
-
-      console.log('Fulfillment Handover: Searching for order in All Orders:', placedOrderNumber);
-      const readyRow = fulfillmentPage.locator('.q-table tbody tr.cursor-pointer, .q-table tbody tr').filter({ hasText: placedOrderNumber }).first();
-      await readyRow.waitFor({ state: 'visible', timeout: 20000 });
-
-      // Click 3-dots action menu -> Start Fulfilling
-      const dotsBtn = readyRow.locator('.action-dropdown, button, .q-btn').last();
-      await dotsBtn.click();
-      const startFulfillItem = fulfillmentPage.locator('.q-menu .q-item, .action-menu .q-item, [role="menuitem"]').filter({ hasText: /Start Fulfilling/i }).first();
-      await startFulfillItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      if (await startFulfillItem.isVisible().catch(() => false)) {
-        await startFulfillItem.click();
-      } else {
-        await readyRow.click();
-      }
+      await fulfillmentSidebar.goToReady();
+      await readyOrdersPage.expectOnReadyPage();
+      await readyOrdersPage.expectTableLoaded();
+      console.log('Fulfillment Handover: Searching for order in Ready Orders:', placedOrderNumber);
+      await readyOrdersPage.search(placedOrderNumber);
+      await readyOrdersPage.expectTableLoaded();
+      await readyOrdersPage.openOrderForHandover(placedOrderNumber);
 
       await storePickupDetailPage.expectOnOrderDetail();
       await storePickupDetailPage.clickContinue();

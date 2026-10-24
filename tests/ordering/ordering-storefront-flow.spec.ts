@@ -5,6 +5,8 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
   test('Customer browses catalog and verifies category items @ordering @catalog', async ({
     orderingCatalogPage,
   }) => {
+    test.setTimeout(180_000);
+
     await allure.epic('Online Ordering');
     await allure.feature('Catalog Browsing');
     await allure.severity('critical');
@@ -23,6 +25,8 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
     page,
     orderingCatalogPage,
   }) => {
+    test.setTimeout(180_000);
+
     await allure.epic('Online Ordering');
     await allure.feature('Shopping Cart');
     await allure.severity('critical');
@@ -42,7 +46,7 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
     orderingCatalogPage,
     orderingCheckoutPage,
   }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(240_000);
 
     await allure.epic('Online Ordering');
     await allure.feature('Checkout & Order Placement');

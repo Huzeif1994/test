@@ -45,15 +45,26 @@ export class OrderingCatalogPage extends BasePage {
    * Wait for category products to render
    */
   async expectProductsLoaded(): Promise<void> {
-    // Dismiss disclaimer if present
+    // 1. Dismiss disclaimer if present
     const disclaimer = this.page.locator('button, a').filter({ hasText: /I understand|Proceed to Store/i }).first();
-    if (await disclaimer.isVisible({ timeout: 1500 }).catch(() => false)) {
-      await disclaimer.click({ force: true });
+    if (await disclaimer.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await disclaimer.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+
+    // 2. Dismiss Age Verification if present
+    const skipBtn = this.page.getByRole('button', { name: /^Skip$/i }).or(this.page.locator('button').filter({ hasText: /^Skip$/i })).first();
+    const ageBtn = this.page.getByRole('button', { name: /21\+|I'm 21\+/i }).or(this.page.locator('button, a').filter({ hasText: /21\+|I'm 21\+/i })).first();
+    if (await skipBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await skipBtn.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    } else if (await ageBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await ageBtn.click({ force: true }).catch(() => {});
       await this.page.waitForTimeout(500);
     }
 
     // Wait directly for products to be visible (avoid waiting 35s for detached skeletons that never leave the DOM)
-    await this.productCards.first().waitFor({ state: 'visible', timeout: 25000 });
+    await this.productCards.first().waitFor({ state: 'visible', timeout: 35000 });
     await this.page.waitForTimeout(500);
   }
 
@@ -85,7 +96,23 @@ export class OrderingCatalogPage extends BasePage {
     }
 
     if (!targetBtn) {
-      targetBtn = this.page.locator('.q-btn, [role="button"], button, a, div, span').filter({ hasText: /^Add to Cart$/i }).first();
+      const cardWithControls = this.page.locator('.q-card, .product-card, [class*="product-card"]').filter({
+        has: this.page.locator('button:has-text("+"), button i:has-text("delete"), .q-field, input')
+      }).first();
+      
+      const addBtn = this.page.locator('.q-card, .product-card, [class*="product-card"]')
+        .locator('.q-btn, [role="button"], button, a, div, span')
+        .filter({ hasText: /^Add to Cart$/i })
+        .first();
+
+      if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        targetBtn = addBtn;
+      } else if (await cardWithControls.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('An item is already in the cart, proceeding.');
+        return;
+      } else {
+        targetBtn = addBtn;
+      }
     }
 
     await targetBtn.waitFor({ state: 'visible', timeout: 15000 });

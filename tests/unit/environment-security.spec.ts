@@ -37,3 +37,4 @@ test.describe('Environment & Secrets Security — Unit Test Suite', () => {
     expect(getBaseUrl('CUSTOM_URL_TEST', 'https://default.url.com')).toBe('https://custom.override.com');
   });
 });
+

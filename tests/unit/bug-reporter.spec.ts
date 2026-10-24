@@ -89,3 +89,4 @@ test.describe('Automated Defect Reporter — Unit Test Suite', () => {
     expect(failures.length).toBe(0);
   });
 });
+

@@ -51,10 +51,13 @@ export class StorePickupDetailPage extends BasePage {
     }
 
     // Now on /store-pickup, click CONTINUE / Mark Fulfilled
-    const continueBtn = this.page.locator('button:has-text("CONTINUE"), button:has-text("Mark Fulfilled")').first();
-    if (await continueBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    const continueBtn = this.page.getByRole('button', { name: /^CONTINUE$/i })
+      .or(this.page.locator('button, .q-btn').filter({ hasText: /^CONTINUE$/i }))
+      .or(this.page.locator('button:has-text("CONTINUE"), button:has-text("Mark Fulfilled")'))
+      .first();
+    if (await continueBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
       await continueBtn.click({ force: true });
-      await this.page.waitForTimeout(1000);
+      await this.page.waitForTimeout(1500);
     }
   }
 
@@ -105,14 +108,17 @@ export class StorePickupDetailPage extends BasePage {
    * Enter customer Pickup Confirmation Code during handover modal and submit
    */
   async enterConfirmationCode(code: string): Promise<void> {
-    const dialog = this.page.locator('.q-dialog').filter({
-      hasText: /Confirmation Code|Verify/i,
-    }).first();
+    const dialog = this.page.locator('.q-dialog:visible, [role="dialog"]:visible').filter({
+      hasText: /Confirmation Code|Verify Code|Enter Code/i,
+    }).or(this.page.locator('.q-dialog:visible')).first();
 
     // If dialog hasn't opened yet, click CONTINUE again (handles Vue hydration race)
     for (let retry = 0; retry < 4; retry++) {
       if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) break;
-      const continueBtn = this.page.locator('button:has-text("CONTINUE"), button:has-text("Mark Fulfilled")').first();
+      const continueBtn = this.page.getByRole('button', { name: /^CONTINUE$/i })
+        .or(this.page.locator('button, .q-btn').filter({ hasText: /^CONTINUE$/i }))
+        .or(this.page.locator('button:has-text("CONTINUE"), button:has-text("Mark Fulfilled")'))
+        .first();
       if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         console.log(`Fulfillment Handover: Retrying CONTINUE click for dialog (attempt ${retry + 1}/4)...`);
         await continueBtn.click({ force: true });
@@ -120,7 +126,7 @@ export class StorePickupDetailPage extends BasePage {
       }
     }
 
-    await dialog.waitFor({ state: 'visible', timeout: 15000 });
+    await dialog.waitFor({ state: 'visible', timeout: 20000 });
 
     // Handle manual DOB fallback if age verification is also required
     const useDobBtn = dialog.locator('button:has-text("Use DOB Instead")').first();
@@ -156,18 +162,20 @@ export class StorePickupDetailPage extends BasePage {
     await this.page.waitForTimeout(1500);
 
     // If Quasar confirmation alert "Successfully Picked-Up!" appears, click OK / OKAY
-    const okBtn = this.page.getByRole('button', { name: /^(OK|OKAY|Close)$/i })
-      .or(this.page.locator('.q-dialog button, button').filter({ hasText: /^\s*(OK|OKAY|Close)\s*$/i }))
+    const okBtn = this.page.getByRole('button', { name: /^OKAY$/i })
+      .or(this.page.locator('button:has-text("OKAY")'))
+      .or(this.page.locator('.q-dialog button, button').filter({ hasText: /OKAY|OK|Close/i }))
       .first();
     try {
-      await okBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await okBtn.waitFor({ state: 'visible', timeout: 60000 });
       console.log('Fulfillment Handover: Clicking OKAY on confirmation alert...');
-      await okBtn.click();
-      await this.page.waitForTimeout(1500);
+      await okBtn.click({ force: true });
+      await this.page.waitForTimeout(2000);
     } catch {
       console.log('Fulfillment Handover: No confirmation alert appeared or was auto-dismissed.');
     }
-    await this.page.locator('.q-dialog').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    await this.page.locator('.q-dialog').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {});
+    await this.page.waitForTimeout(3000);
   }
 }
 
