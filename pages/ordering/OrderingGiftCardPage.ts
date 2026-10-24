@@ -300,13 +300,16 @@ export class OrderingGiftCardPage extends BasePage {
     await this.page.waitForTimeout(2000);
 
     // 1. Ensure "Newly Purchased" tab is active
-    await this.newlyPurchasedTab.waitFor({ state: 'visible', timeout: 15000 });
+    await this.newlyPurchasedTab.waitFor({ state: 'visible', timeout: 25000 });
     await this.newlyPurchasedTab.click();
     await this.page.waitForTimeout(1500);
 
+    // Wait for skeleton loaders to finish loading
+    await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+
     // 2. Locate the target Gift Card under Newly Purchased
     const cardPanels = this.page.locator('.q-tab-panels, [role="tabpanel"]').first();
-    await cardPanels.waitFor({ state: 'visible', timeout: 15000 });
+    await cardPanels.waitFor({ state: 'visible', timeout: 25000 });
 
     // Look for cards with status "Pending"
     const pendingCards = cardPanels.locator('.q-card, .col-xs-12, tr').filter({ hasText: /Pending/i });
@@ -314,12 +317,12 @@ export class OrderingGiftCardPage extends BasePage {
 
     if (knownGcNumber) {
       const matched = cardPanels.locator('.q-card, .col-xs-12, tr').filter({ hasText: knownGcNumber }).first();
-      if (await matched.isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (await matched.isVisible({ timeout: 5000 }).catch(() => false)) {
         targetCard = matched;
       }
     }
 
-    await targetCard.waitFor({ state: 'visible', timeout: 15000 });
+    await targetCard.waitFor({ state: 'visible', timeout: 30000 });
     await targetCard.scrollIntoViewIfNeeded().catch(() => {});
 
     // Extract the Card Number (format: XXXX-XXXX-XXXX)

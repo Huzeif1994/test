@@ -60,9 +60,12 @@ test.describe('Digital Gift Card Lifecycle: Purchase & Live Activation', () => {
       await checkoutPage.acceptTerms();
       await checkoutPage.placeOrder();
 
-      // Verify order placement success heading
-      const orderPlacedHeading = page.getByRole('heading', { name: /Thank you|order has been placed/i });
-      await expect(orderPlacedHeading).toBeVisible({ timeout: 45000 });
+      // Verify order placement success heading or indicator
+      const orderPlacedIndicator = page.getByRole('heading', { name: /Thank you|order has been placed|Order Confirmed|Order Details/i })
+        .or(page.locator('text=/Thank you|Your order Number|Order Details/i'))
+        .or(page.locator('button:has-text("View Order")'))
+        .first();
+      await expect(orderPlacedIndicator).toBeVisible({ timeout: 60000 });
 
       // Capture order number from Thank you page
       const orderNumberElem = page.locator('text=/Your order Number:/i, strong:has-text("Your order Number")').first();

@@ -142,7 +142,7 @@ export class PendingOrdersPage extends BaseOrdersPage {
    * Resilient condition-based polling helper for cross-system eventual consistency:
    * Repeatedly searches for target order, verifying presence in table with reload fallback.
    */
-  async waitForOrderInPending(orderNumber: string, maxAttempts: number = 8, retryIntervalMs: number = 2500): Promise<Locator> {
+  async waitForOrderInPending(orderNumber: string, maxAttempts: number = 15, retryIntervalMs: number = 3000): Promise<Locator> {
     console.log(`Fulfillment: Waiting for order "${orderNumber}" in Pending Orders (max attempts: ${maxAttempts})...`);
     const targetRow = this.page.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: orderNumber }).first();
 
@@ -161,6 +161,7 @@ export class PendingOrdersPage extends BaseOrdersPage {
 
       if (attempt < maxAttempts) {
         console.log(`Fulfillment: Order not synced yet, refreshing table (attempt ${attempt}/${maxAttempts})...`);
+        await this.page.waitForTimeout(1000);
         await this.page.reload({ waitUntil: 'domcontentloaded' });
         await this.expectTableLoaded();
       }

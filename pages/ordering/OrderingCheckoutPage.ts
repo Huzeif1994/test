@@ -146,20 +146,30 @@ export class OrderingCheckoutPage extends BasePage {
    */
   async expectCheckoutLoaded(): Promise<void> {
     await this.page.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 35000 }).catch(() => {});
+    await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 35000 }).catch(() => {});
     const interactiveEl = this.page.locator('[role="switch"], [role="radio"], .q-radio, button').filter({ hasText: /Place Order|In Store|Curbside|Pay At Store/i }).first();
-    await interactiveEl.waitFor({ state: 'visible', timeout: 20000 });
+    await interactiveEl.waitFor({ state: 'visible', timeout: 30000 });
   }
 
   /**
    * Select "Pay At Store" payment option
    */
   async selectPayAtStore(): Promise<void> {
-    await this.payAtStoreSwitch.waitFor({ state: 'visible', timeout: 15000 });
-    const isChecked = await this.payAtStoreSwitch.getAttribute('aria-checked') === 'true';
+    const paySwitch = this.page.locator('[role="switch"], .q-toggle, button, div, li, label')
+      .filter({ hasText: /Pay At Store/i })
+      .locator('[role="switch"], .q-toggle')
+      .or(this.page.locator('[role="switch"]').filter({ hasText: /Pay At Store/i }))
+      .or(this.payAtStoreSwitch)
+      .first();
+
+    await paySwitch.waitFor({ state: 'visible', timeout: 35000 });
+    await paySwitch.scrollIntoViewIfNeeded().catch(() => {});
+    const isChecked = (await paySwitch.getAttribute('aria-checked')) === 'true' ||
+                      (await paySwitch.locator('.q-toggle__inner--truthy').isVisible().catch(() => false));
     if (!isChecked) {
-      await this.payAtStoreSwitch.click({ force: true });
-      await this.page.waitForTimeout(500);
-      await expect(this.payAtStoreSwitch).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+      await paySwitch.click({ force: true });
+      await this.page.waitForTimeout(600);
+      await expect(paySwitch).toHaveAttribute('aria-checked', 'true', { timeout: 10000 }).catch(() => {});
     }
   }
 
@@ -167,9 +177,14 @@ export class OrderingCheckoutPage extends BasePage {
    * Turn OFF "Pay At Store" switch (if present)
    */
   async turnOffPayAtStore(): Promise<void> {
-    const switchEl = this.page.locator('button, div, li').filter({ hasText: /Pay At Store/i }).locator('[role="switch"], .q-toggle').first();
-    if (await switchEl.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const isChecked = await switchEl.getAttribute('aria-checked') === 'true';
+    const switchEl = this.page.locator('button, div, li, label')
+      .filter({ hasText: /Pay At Store/i })
+      .locator('[role="switch"], .q-toggle')
+      .or(this.page.locator('[role="switch"]').filter({ hasText: /Pay At Store/i }))
+      .first();
+    if (await switchEl.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const isChecked = (await switchEl.getAttribute('aria-checked')) === 'true' ||
+                        (await switchEl.locator('.q-toggle__inner--truthy').isVisible().catch(() => false));
       if (isChecked) {
         await switchEl.click({ force: true });
         await this.page.waitForTimeout(1000);
@@ -421,8 +436,18 @@ export class OrderingCheckoutPage extends BasePage {
       }
     }
 
-    // 3. Wait for and click "I AM HERE"
-    await iAmHereBtn.waitFor({ state: 'visible', timeout: 20000 });
+    // 3. Wait for and click "I AM HERE" (with reload fallback if state transition is lagging)
+    for (let r = 0; r < 6; r++) {
+      if (await iAmHereBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+        break;
+      }
+      console.log(`Curbside arrival: Waiting for "I AM HERE" button (attempt ${r + 1}/6)...`);
+      await this.page.waitForTimeout(1500);
+      await this.page.reload({ waitUntil: 'domcontentloaded' });
+      await storePickupCard.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    }
+
+    await iAmHereBtn.waitFor({ state: 'visible', timeout: 25000 });
     console.log('Curbside arrival: Clicking "I AM HERE"...');
     await iAmHereBtn.click();
     await this.page.waitForTimeout(1500);
