@@ -203,8 +203,9 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
       const mobilePage = await mobileContext.newPage();
       listenForConfirmationCode(mobilePage);
 
-      const trackUrl = customerPage.url();
-      await mobilePage.goto(trackUrl, { waitUntil: 'domcontentloaded' });
+      const targetTrackUrl = placedOrderNumber ? `/track-order/${placedOrderNumber}` : customerPage.url();
+      console.log('Flow 2: Mobile View opening target track URL:', targetTrackUrl);
+      await mobilePage.goto(targetTrackUrl, { waitUntil: 'domcontentloaded' });
 
       const mobileCheckoutPage = new OrderingCheckoutPage(mobilePage);
       await mobileCheckoutPage.completeMobileCurbsideArrival({

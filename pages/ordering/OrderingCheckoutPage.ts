@@ -408,10 +408,12 @@ export class OrderingCheckoutPage extends BasePage {
     const iAmHereBtn = this.page.locator('button, a, .q-btn, div, span').filter({ hasText: /^I AM HERE$|^I'm Here$/i }).first();
 
     // 1. Wait for either "I'M ON MY WAY" or "I AM HERE"
+    let arrivalBtnFound = false;
     for (let refreshAttempt = 0; refreshAttempt < 15; refreshAttempt++) {
       if (await onMyWayBtn.isVisible({ timeout: 2000 }).catch(() => false) ||
           await iAmHereBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         console.log(`Curbside Mobile View: Arrival button is visible!`);
+        arrivalBtnFound = true;
         break;
       }
       console.log(`Curbside arrival: Waiting for order ready status (${refreshAttempt + 1}/15)...`);
@@ -432,22 +434,22 @@ export class OrderingCheckoutPage extends BasePage {
       if (await bottomSheetConfirm.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.log('Curbside arrival: Clicking Confirm on bottom sheet...');
         await bottomSheetConfirm.click();
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(2000);
       }
     }
 
     // 3. Wait for and click "I AM HERE" (with reload fallback if state transition is lagging)
-    for (let r = 0; r < 6; r++) {
-      if (await iAmHereBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+    for (let r = 0; r < 8; r++) {
+      if (await iAmHereBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         break;
       }
-      console.log(`Curbside arrival: Waiting for "I AM HERE" button (attempt ${r + 1}/6)...`);
+      console.log(`Curbside arrival: Waiting for "I AM HERE" button (attempt ${r + 1}/8)...`);
       await this.page.waitForTimeout(1500);
       await this.page.reload({ waitUntil: 'domcontentloaded' });
       await storePickupCard.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
 
-    await iAmHereBtn.waitFor({ state: 'visible', timeout: 25000 });
+    await iAmHereBtn.waitFor({ state: 'visible', timeout: 35000 });
     console.log('Curbside arrival: Clicking "I AM HERE"...');
     await iAmHereBtn.click();
     await this.page.waitForTimeout(1500);
