@@ -1,0 +1,109 @@
+{
+  "id": "US-001",
+  "title": "Customer Store Pickup with Credit Card and Fulfillment Handover",
+  "persona": "Retail Customer (Desktop) & Fulfillment Employee (Desktop)",
+  "priority": "High",
+  "targetProjects": [
+    "e2e-bridge",
+    "ordering",
+    "fulfillment"
+  ],
+  "preconditions": {
+    "authStates": [
+      ".auth/ordering.json",
+      ".auth/fulfillment.json"
+    ],
+    "devices": [],
+    "store": "Madison01"
+  },
+  "scenarios": [
+    {
+      "name": "Complete In-Store Pickup Lifecycle with Confirmation Code Handover",
+      "steps": [
+        {
+          "type": "GIVEN",
+          "text": "Customer clears shopping cart and navigates to \"huzeif-test\" category",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCatalogPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Customer adds \"CASA TURRENT SERIE 1973 ROBUSTO\" product to cart and proceeds to checkout",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCatalogPage",
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Customer selects \"In Store Pickup\", turns off \"Pay At Store\", and selects \"Credit or Debit Card\"",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Customer accepts terms and places order, capturing Order ID and Confirmation Code",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage",
+            "ReadyOrdersPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Fulfillment employee searches for the placed order in Pending Orders",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "PendingOrdersPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Fulfillment employee initiates Start Picking and picks all required items",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "PickOrderDetailPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Fulfillment employee completes package assignment and marks the order Ready",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "PickOrderPackagePage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Fulfillment employee navigates to Ready Orders and opens order for handover",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "ReadyOrdersPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Fulfillment employee submits customer confirmation code in Handover modal",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "ReadyOrdersPage"
+          ]
+        },
+        {
+          "type": "THEN",
+          "text": "The order transitions to Fulfilled status and appears in Fulfilled Orders listing",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "FulfilledOrdersPage"
+          ]
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-10-24T15:51:22.884Z"
+}

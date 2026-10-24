@@ -1,0 +1,104 @@
+{
+  "id": "US-002",
+  "title": "Curbside Pickup with Mobile Emulation and Live Vehicle Arrival",
+  "persona": "Mobile Customer (Pixel 5) & Fulfillment Employee (Desktop)",
+  "priority": "High",
+  "targetProjects": [
+    "e2e-bridge",
+    "ordering",
+    "fulfillment"
+  ],
+  "preconditions": {
+    "authStates": [
+      ".auth/ordering.json",
+      ".auth/fulfillment.json"
+    ],
+    "devices": [
+      "Mobile",
+      "mobile"
+    ]
+  },
+  "scenarios": [
+    {
+      "name": "Complete Curbside Mobile Arrival and Vehicle Verification",
+      "steps": [
+        {
+          "type": "GIVEN",
+          "text": "Customer clears shopping cart and navigates to \"huzeif-test\" category",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCatalogPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Customer adds product to cart, proceeds to checkout, and selects \"Curbside Pickup\"",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCatalogPage",
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Customer turns off \"Pay At Store\", selects Credit Card, places order, and captures Order ID and Confirmation Code",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage",
+            "ReadyOrdersPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Fulfillment employee opens Pending Orders, picks all items, and marks order Ready",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "PendingOrdersPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Customer opens order in Mobile Device View (Pixel 5)",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "BasePage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Customer verifies \"Ready For Pickup\" status and completes mobile vehicle arrival submission with Spot \"Spot - A\", Color \"Black\", Maker \"Acura\", Model \"CL\"",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Fulfillment employee navigates to Ready Orders and opens the curbside order",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage",
+            "ReadyOrdersPage"
+          ]
+        },
+        {
+          "type": "THEN",
+          "text": "Fulfillment employee verifies Curbside Pickup method and Parking Spot / Car Info blocks",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Fulfillment employee completes handover with confirmation code transitioning order to Fulfilled",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "ReadyOrdersPage"
+          ]
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-10-24T15:51:22.890Z"
+}

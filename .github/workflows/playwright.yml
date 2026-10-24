@@ -65,6 +65,10 @@ jobs:
       - name: Run tests
         run: npx playwright test --project=${{ matrix.project }}
 
+      - name: AI Autonomous Defect & Blast Radius Triage
+        if: ${{ !cancelled() }}
+        run: npm run report:bug || true
+
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -105,6 +109,10 @@ jobs:
 
       - name: Run E2E Bridge tests
         run: npx playwright test --project=e2e-bridge
+
+      - name: AI Autonomous Defect & Blast Radius Triage
+        if: ${{ !cancelled() }}
+        run: npm run report:bug || true
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

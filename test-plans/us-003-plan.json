@@ -1,0 +1,75 @@
+{
+  "id": "US-003",
+  "title": "Physical Gift Card End-to-End Purchase, Barcode Assignment, and POS Sync",
+  "persona": "Retail Customer (Desktop), Fulfillment Employee (Desktop), Admin Auditor",
+  "priority": "Critical",
+  "targetProjects": [
+    "e2e-bridge",
+    "ordering",
+    "fulfillment",
+    "admin"
+  ],
+  "preconditions": {
+    "authStates": [
+      ".auth/ordering.json",
+      ".auth/fulfillment.json"
+    ],
+    "devices": []
+  },
+  "scenarios": [
+    {
+      "name": "Physical Gift Card Purchase to POS Barcode Activation",
+      "steps": [
+        {
+          "type": "GIVEN",
+          "text": "Customer selects Physical Gift Card with customized design amount",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingGiftCardPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Customer completes checkout with Credit Card and captures order reference",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "Fulfillment employee opens order in Picking screen",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "PickOrderDetailPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Fulfillment employee scans and binds dynamic 12-digit barcode into Item Info drawer",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "PickOrderDetailPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "Fulfillment employee marks order Ready and performs Handover",
+          "targetDomain": "fulfillment",
+          "suggestedPageObjects": [
+            "ReadyOrdersPage"
+          ]
+        },
+        {
+          "type": "THEN",
+          "text": "Customer navigates to Gift Cards tab and confirms newly bound physical card appears in Active Cards list",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingGiftCardPage"
+          ]
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-10-24T15:51:22.893Z"
+}

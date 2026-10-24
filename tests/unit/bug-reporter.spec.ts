@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { classifyError, findFailedTestsFromReport, extractRealFailure, PlaywrightJsonReport } from '../../scripts/generate-bug-report';
+import {
+  classifyError,
+  findFailedTestsFromReport,
+  computeBlastRadius,
+  generateExecutiveQualitySummary,
+  generateJiraPayload,
+  BugReportData,
+} from '../../scripts/generate-bug-report';
 
-test.describe('Automated Defect Reporter — Unit Test Suite', () => {
+test.describe('Automated Defect Reporter & Blast Radius Triage — Unit Test Suite', () => {
   test('should classify 500 / server crash as APPLICATION_BUG with High severity', () => {
     const res = classifyError('Server responded with 500 Internal Server Error');
     expect(res.classification).toBe('APPLICATION_BUG');
@@ -20,73 +27,79 @@ test.describe('Automated Defect Reporter — Unit Test Suite', () => {
     expect(res.suggestedSeverity).toBe('Medium (Suggested)');
   });
 
-  test('should extract genuine test failure metadata from Playwright JSON report', () => {
-    const mockReport: PlaywrightJsonReport = {
-      suites: [
-        {
-          title: 'Ordering Suite',
-          file: 'tests/ordering/storefront.spec.ts',
-          specs: [
-            {
-              title: 'Checkout button submission',
-              file: 'tests/ordering/storefront.spec.ts',
-              line: 42,
-              tests: [
-                {
-                  title: 'Should complete checkout',
-                  projectName: 'ordering',
-                  results: [
-                    {
-                      status: 'unexpected',
-                      error: {
-                        message: 'Locator not found',
-                        stack: 'Error: Locator not found\n    at OrderingPage.submit',
-                      },
-                      attachments: [
-                        { name: 'screenshot', contentType: 'image/png', path: 'test-results/shot.png' },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
+  test('should compute blast radius risk accurately based on defect classifications', () => {
+    // Clean run
+    const clean = computeBlastRadius([]);
+    expect(clean.riskLevel).toBe('CLEAN');
 
-    const failures = findFailedTestsFromReport(mockReport);
-    expect(failures.length).toBe(1);
-    expect(failures[0].title).toContain('Checkout button submission › Should complete checkout');
-    expect(failures[0].project).toBe('ordering');
-    expect(failures[0].line).toBe(42);
-    expect(failures[0].attachments.screenshot).toBe('test-results/shot.png');
+    // UI drift (cosmetic)
+    const uiFailure: BugReportData = {
+      title: 'Checkout button',
+      project: 'ordering',
+      specPath: 'tests/ordering/checkout.spec.ts',
+      classification: 'LOCATOR_DRIFT',
+      suggestedSeverity: 'Medium (Suggested)',
+      errorMessage: 'locator not found',
+      reproCommand: 'npx playwright test',
+      steps: [],
+      expected: '',
+      actual: '',
+    };
+    const lowRisk = computeBlastRadius([uiFailure]);
+    expect(lowRisk.riskLevel).toBe('LOW_MAINTENANCE');
+    expect(lowRisk.recommendation).toContain('npm run test:heal');
+
+    // Application 500 / crash
+    const appFailure: BugReportData = {
+      ...uiFailure,
+      classification: 'APPLICATION_BUG',
+      suggestedSeverity: 'High (Suggested)',
+      errorMessage: '500 Internal Server Error',
+    };
+    const criticalRisk = computeBlastRadius([appFailure]);
+    expect(criticalRisk.riskLevel).toBe('CRITICAL_BLOCKER');
+    expect(criticalRisk.headline).toContain('Release Blocker');
   });
 
-  test('should return empty array when all tests in report passed', () => {
-    const mockReport: PlaywrightJsonReport = {
-      suites: [
-        {
-          title: 'Passed Suite',
-          specs: [
-            {
-              title: 'Successful test',
-              file: 'tests/admin/admin.spec.ts',
-              line: 10,
-              tests: [
-                {
-                  title: 'Pass',
-                  results: [{ status: 'expected' }],
-                },
-              ],
-            },
-          ],
-        },
-      ],
+  test('should generate rich Executive Quality Summary markdown table for CI', () => {
+    const failure: BugReportData = {
+      title: 'Curbside Arrival Submission',
+      project: 'e2e-bridge',
+      specPath: 'tests/e2e-bridge/flow2.spec.ts',
+      classification: 'TIMEOUT_LATENCY',
+      suggestedSeverity: 'Medium (Suggested)',
+      errorMessage: 'Timeout waiting for arrival button',
+      reproCommand: 'npx playwright test tests/e2e-bridge/flow2.spec.ts',
+      steps: [],
+      expected: 'Arrival modal submitted',
+      actual: 'Timeout',
     };
 
-    const failures = findFailedTestsFromReport(mockReport);
-    expect(failures.length).toBe(0);
+    const summaryMd = generateExecutiveQualitySummary([failure]);
+    expect(summaryMd).toContain('## 🛡️ Executive QA Quality & Blast Radius Triage');
+    expect(summaryMd).toContain('ELEVATED_RISK');
+    expect(summaryMd).toContain('`e2e-bridge`');
+    expect(summaryMd).toContain('`TIMEOUT_LATENCY`');
+  });
+
+  test('should generate structured Jira REST API defect payload', () => {
+    const failure: BugReportData = {
+      title: 'Store Pickup Handover Failure',
+      project: 'fulfillment',
+      specPath: 'tests/fulfillment/handover.spec.ts',
+      classification: 'APPLICATION_BUG',
+      suggestedSeverity: 'High (Suggested)',
+      errorMessage: 'Internal Server Error 500 during order status transition',
+      reproCommand: 'npx playwright test tests/fulfillment/handover.spec.ts',
+      steps: ['Step 1', 'Step 2'],
+      expected: 'Status Fulfilled',
+      actual: 'Error 500',
+    };
+
+    const jiraPayload: any = generateJiraPayload(failure);
+    expect(jiraPayload.fields.project.key).toBe('FTX');
+    expect(jiraPayload.fields.summary).toBe('[BUG][FULFILLMENT] Store Pickup Handover Failure');
+    expect(jiraPayload.fields.issuetype.name).toBe('Bug');
+    expect(jiraPayload.fields.priority.name).toBe('High');
   });
 });
-

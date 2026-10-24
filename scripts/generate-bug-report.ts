@@ -66,105 +66,100 @@ interface PlaywrightSpec {
 
 interface PlaywrightSuite {
   title: string;
-  file?: string;
   suites?: PlaywrightSuite[];
   specs?: PlaywrightSpec[];
 }
 
-export interface PlaywrightJsonReport {
+interface PlaywrightJsonReport {
   suites?: PlaywrightSuite[];
-  errors?: any[];
+}
+
+export interface ExtractedFailure {
+  title: string;
+  project: string;
+  specPath: string;
+  line: number;
+  errorMsg: string;
+  attachments: {
+    screenshot?: string;
+    trace?: string;
+    video?: string;
+  };
 }
 
 /**
- * Recursively parses Playwright suites in report.json to find verified failed tests
+ * Recursively traverses Playwright JSON report to find failed tests
  */
-export function findFailedTestsFromReport(report: PlaywrightJsonReport): Array<{
-  title: string;
-  specPath: string;
-  line: number;
-  project: string;
-  errorMsg: string;
-  attachments: { screenshot?: string; trace?: string; video?: string };
-}> {
-  const failed: Array<{
-    title: string;
-    specPath: string;
-    line: number;
-    project: string;
-    errorMsg: string;
-    attachments: { screenshot?: string; trace?: string; video?: string };
-  }> = [];
+export function findFailedTestsFromReport(report: PlaywrightJsonReport): ExtractedFailure[] {
+  const failures: ExtractedFailure[] = [];
 
-  function traverseSuite(suite: PlaywrightSuite, currentFile?: string) {
-    const file = suite.file || currentFile || '';
+  function traverseSuite(suite: PlaywrightSuite) {
     if (suite.specs) {
       for (const spec of suite.specs) {
-        for (const test of spec.tests) {
-          for (const res of test.results) {
-            if (res.status === 'unexpected' || res.status === 'timedOut' || res.status === 'failed') {
-              const attachments = {
-                screenshot: res.attachments?.find(a => a.contentType.includes('image') || a.name === 'screenshot')?.path,
-                trace: res.attachments?.find(a => a.name === 'trace' || (a.path && a.path.endsWith('.zip')))?.path,
-                video: res.attachments?.find(a => a.contentType.includes('video') || (a.path && a.path.endsWith('.webm')))?.path,
-              };
+        for (const t of spec.tests) {
+          const failedResult = t.results.find((r) => r.status === 'failed' || r.status === 'timedOut');
+          if (failedResult && failedResult.error) {
+            const rawMsg = failedResult.error.message || failedResult.error.stack || 'Unknown error';
+            // Strip ANSI escape codes
+            const cleanMsg = rawMsg.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
-              failed.push({
-                title: `${spec.title} › ${test.title}`,
-                specPath: spec.file || file,
-                line: spec.line,
-                project: test.projectName || 'default',
-                errorMsg: res.error?.stack || res.error?.message || 'Unknown test failure',
-                attachments,
-              });
+            const attachments: ExtractedFailure['attachments'] = {};
+            if (failedResult.attachments) {
+              for (const att of failedResult.attachments) {
+                if (att.name === 'screenshot') attachments.screenshot = att.path;
+                if (att.name === 'trace') attachments.trace = att.path;
+                if (att.name === 'video') attachments.video = att.path;
+              }
             }
+
+            failures.push({
+              title: spec.title,
+              project: t.projectName || 'default',
+              specPath: spec.file,
+              line: spec.line,
+              errorMsg: cleanMsg,
+              attachments,
+            });
           }
         }
       }
     }
 
     if (suite.suites) {
-      for (const child of suite.suites) {
-        traverseSuite(child, file);
+      for (const childSuite of suite.suites) {
+        traverseSuite(childSuite);
       }
     }
   }
 
   if (report.suites) {
-    for (const suite of report.suites) {
-      traverseSuite(suite);
+    for (const rootSuite of report.suites) {
+      traverseSuite(rootSuite);
     }
   }
 
-  return failed;
+  return failures;
 }
 
 /**
- * Extracts confirmed bug data strictly from verified execution metadata of the current run session.
- * Prevents stale artifacts from previous days or unverified folders from generating false defects.
+ * Extracts all verified failures from test-results/report.json
  */
-export function extractRealFailure(options: { maxAgeMinutes?: number; reportPath?: string } = {}): BugReportData | null {
-  const maxAgeMinutes = options.maxAgeMinutes ?? 60;
-  const reportPath = options.reportPath || path.resolve(process.cwd(), 'test-results/report.json');
-
+export function extractAllFailures(reportPath: string = 'test-results/report.json', maxAgeMinutes: number = 60): BugReportData[] {
   if (!fs.existsSync(reportPath)) {
-    return null;
+    return [];
   }
 
-  // Verify artifact freshness (must be from the active execution session)
   const stat = fs.statSync(reportPath);
   const ageMinutes = (Date.now() - stat.mtimeMs) / (1000 * 60);
   if (ageMinutes > maxAgeMinutes) {
-    console.log(`ℹ️  Found ${reportPath}, but it is ${Math.round(ageMinutes)} minutes old (exceeds session threshold of ${maxAgeMinutes}m).`);
-    console.log(`   Ignoring stale report to prevent obsolete defect filing.`);
-    return null;
+    console.log(`ℹ️  Found ${reportPath}, but it is ${Math.round(ageMinutes)} minutes old. Ignoring stale report.`);
+    return [];
   }
 
   try {
     const json: PlaywrightJsonReport = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
     const failures = findFailedTestsFromReport(json);
-    if (failures.length > 0) {
-      const f = failures[0];
+    return failures.map((f) => {
       const { classification, suggestedSeverity } = classifyError(f.errorMsg);
       return {
         title: f.title,
@@ -186,12 +181,18 @@ export function extractRealFailure(options: { maxAgeMinutes?: number; reportPath
         tracePath: f.attachments.trace,
         videoPath: f.attachments.video,
       };
-    }
+    });
   } catch {
-    // Malformed report
+    return [];
   }
+}
 
-  return null;
+/**
+ * Extracts first verified failure (backward compatibility)
+ */
+export function extractRealFailure(reportPath: string = 'test-results/report.json', maxAgeMinutes: number = 60): BugReportData | null {
+  const all = extractAllFailures(reportPath, maxAgeMinutes);
+  return all.length > 0 ? all[0] : null;
 }
 
 /**
@@ -274,6 +275,89 @@ h3. 📸 Forensic Artifacts
 `;
 }
 
+/**
+ * Computes an executive blast-radius risk evaluation across all failures
+ */
+export function computeBlastRadius(failures: BugReportData[]): {
+  riskLevel: 'CRITICAL_BLOCKER' | 'ELEVATED_RISK' | 'LOW_MAINTENANCE' | 'CLEAN';
+  headline: string;
+  recommendation: string;
+} {
+  if (failures.length === 0) {
+    return {
+      riskLevel: 'CLEAN',
+      headline: 'All Quality Gates Passed (100% Green Build)',
+      recommendation: 'Safe to proceed with release and deployment.',
+    };
+  }
+
+  const hasAppBug = failures.some(f => f.classification === 'APPLICATION_BUG');
+  const hasTimeout = failures.some(f => f.classification === 'TIMEOUT_LATENCY');
+
+  if (hasAppBug) {
+    return {
+      riskLevel: 'CRITICAL_BLOCKER',
+      headline: 'Release Blocker: Server crash, 5xx error, or core business logic defect detected',
+      recommendation: 'Halt deployment pipeline immediately; file critical defect with backend engineering.',
+    };
+  }
+
+  if (hasTimeout) {
+    return {
+      riskLevel: 'ELEVATED_RISK',
+      headline: 'Elevated Risk: Eventual consistency sync lag or slow endpoint latency observed',
+      recommendation: 'Review database read-replica sync intervals and expand polling threshold before promotion.',
+    };
+  }
+
+  return {
+    riskLevel: 'LOW_MAINTENANCE',
+    headline: 'Low Blast Radius: Cosmetic UI changes or selector drift detected',
+    recommendation: 'Trigger automated self-healing via `npm run test:heal` to update Page Object locators.',
+  };
+}
+
+/**
+ * Generates an Executive Quality & Risk Assessment summary for GitHub Step Summary
+ */
+export function generateExecutiveQualitySummary(failures: BugReportData[]): string {
+  const blast = computeBlastRadius(failures);
+
+  let md = `## 🛡️ Executive QA Quality & Blast Radius Triage\n\n`;
+  md += `| Metric | Assessment |\n`;
+  md += `| :--- | :--- |\n`;
+  md += `| **Overall Risk Status** | **${blast.riskLevel}** |\n`;
+  md += `| **Failures Detected** | \`${failures.length}\` |\n`;
+  md += `| **Executive Verdict** | ${blast.headline} |\n`;
+  md += `| **Action Recommendation** | ${blast.recommendation} |\n\n`;
+
+  if (failures.length > 0) {
+    md += `### 📋 Detected Defect Inventory\n\n`;
+    md += `| Project | Spec Target | Failure Classification | Severity |\n`;
+    md += `| :--- | :--- | :--- | :--- |\n`;
+    for (const f of failures) {
+      md += `| \`${f.project}\` | \`${f.specPath}\` | \`${f.classification}\` | \`${f.suggestedSeverity}\` |\n`;
+    }
+  }
+
+  return md;
+}
+
+/**
+ * Generates standard Jira REST API Issue Payload
+ */
+export function generateJiraPayload(data: BugReportData): object {
+  return {
+    fields: {
+      project: { key: 'FTX' },
+      summary: `[BUG][${data.project.toUpperCase()}] ${data.title}`,
+      description: `*Classification:* ${data.classification}\n*Spec:* ${data.specPath}\n*Repro:* ${data.reproCommand}\n\n*Error:*\n${data.errorMessage.slice(0, 500)}`,
+      issuetype: { name: 'Bug' },
+      priority: { name: data.suggestedSeverity.includes('Critical') ? 'Highest' : data.suggestedSeverity.includes('High') ? 'High' : 'Medium' },
+    },
+  };
+}
+
 if (require.main === module) {
   const args = process.argv.slice(2);
   const isJira = args.includes('--jira');
@@ -287,6 +371,10 @@ if (require.main === module) {
     console.log('No verified failures detected in the active test execution session.');
     console.log('Zero false-positive reports generated from stale artifacts.');
     console.log('==================================================\n');
+
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, generateExecutiveQualitySummary([]), 'utf8');
+    }
     process.exit(0);
   }
 
@@ -300,10 +388,21 @@ if (require.main === module) {
   const outPath = path.join(outDir, `bug-report-${Date.now()}.${isJira ? 'txt' : 'md'}`);
   fs.writeFileSync(outPath, output, 'utf-8');
 
+  // Also write Jira JSON payload
+  const jiraPayload = generateJiraPayload(failure);
+  const jiraPayloadPath = path.join(outDir, 'latest-jira-defect.json');
+  fs.writeFileSync(jiraPayloadPath, JSON.stringify(jiraPayload, null, 2), 'utf-8');
+
+  // If in CI, append executive summary to GITHUB_STEP_SUMMARY
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, generateExecutiveQualitySummary([failure]) + '\n\n' + output, 'utf8');
+  }
+
   console.log('\n==================================================');
   console.log(`🐞 BUG REPORTER — Generated Defect Report (${isJira ? 'Jira' : 'GitHub'} Format)`);
   console.log('==================================================');
-  console.log(`📄 Saved to: ${outPath}\n`);
+  console.log(`📄 Saved to: ${outPath}`);
+  console.log(`📦 Jira REST Payload: ${jiraPayloadPath}\n`);
   console.log(output);
   console.log('==================================================\n');
 }
