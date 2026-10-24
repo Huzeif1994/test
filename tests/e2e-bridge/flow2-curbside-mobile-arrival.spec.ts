@@ -172,7 +172,7 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
       });
     }
 
-    const onAssignPackage = await fulfillmentPage.waitForURL(/assign-package/i, { timeout: 15000 }).then(() => true).catch(() => false);
+    const onAssignPackage = await fulfillmentPage.waitForURL(/assign-package/i, { timeout: 12000 }).then(() => true).catch(() => false);
     if (onAssignPackage) {
       await test.step('Assign Staging Area to package', async () => {
         await pickOrderPackagePage.expectOnAssignPackagePage();
@@ -187,6 +187,14 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
         await pickOrderPackagePage.clickMarkReady();
         await pickOrderPackagePage.expectOrderCompletedAndRedirected();
       });
+    } else {
+      const directMarkReady = fulfillmentPage.locator('button, .q-btn').filter({ hasText: /^MARK READY$/i }).first();
+      if (await directMarkReady.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await test.step('Finalize order: Direct Mark Ready', async () => {
+          await directMarkReady.click();
+          await fulfillmentPage.waitForURL(/pending-order/i, { timeout: 15000 }).catch(() => {});
+        });
+      }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -203,7 +211,8 @@ test.describe('E2E Flow 2: Curbside Pickup with Mobile Emulation & Live Vehicle 
       const mobilePage = await mobileContext.newPage();
       listenForConfirmationCode(mobilePage);
 
-      const targetTrackUrl = placedOrderNumber ? `/track-order/${placedOrderNumber}` : customerPage.url();
+      const customerUrl = customerPage.url();
+      const targetTrackUrl = customerUrl.includes('/track-order/') ? customerUrl : (placedOrderNumber ? `/track-order/${placedOrderNumber}` : customerUrl);
       console.log('Flow 2: Mobile View opening target track URL:', targetTrackUrl);
       await mobilePage.goto(targetTrackUrl, { waitUntil: 'domcontentloaded' });
 
