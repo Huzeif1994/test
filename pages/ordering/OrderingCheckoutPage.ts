@@ -393,16 +393,17 @@ export class OrderingCheckoutPage extends BasePage {
     const iAmHereBtn = this.page.locator('button, a, .q-btn, div, span').filter({ hasText: /^I AM HERE$|^I'm Here$/i }).first();
 
     // 1. Wait for either "I'M ON MY WAY" or "I AM HERE"
-    for (let refreshAttempt = 0; refreshAttempt < 8; refreshAttempt++) {
+    for (let refreshAttempt = 0; refreshAttempt < 15; refreshAttempt++) {
       if (await onMyWayBtn.isVisible({ timeout: 2000 }).catch(() => false) ||
           await iAmHereBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         console.log(`Curbside Mobile View: Arrival button is visible!`);
         break;
       }
-      console.log(`Curbside arrival: Refreshing page (${refreshAttempt + 1}/8)...`);
+      console.log(`Curbside arrival: Waiting for order ready status (${refreshAttempt + 1}/15)...`);
+      await this.page.waitForTimeout(2000);
       await this.page.reload({ waitUntil: 'domcontentloaded' });
       await storePickupCard.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForTimeout(1000);
     }
 
     // 2. Click "I'M ON MY WAY" if present

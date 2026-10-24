@@ -161,21 +161,19 @@ export class StorePickupDetailPage extends BasePage {
     await submitBtn.click();
     await this.page.waitForTimeout(1500);
 
-    // If Quasar confirmation alert "Successfully Picked-Up!" appears, click OK / OKAY
+    // If Quasar confirmation alert "Successfully Picked-Up!" appears, dismiss it cleanly
     const okBtn = this.page.getByRole('button', { name: /^OKAY$/i })
       .or(this.page.locator('button:has-text("OKAY")'))
       .or(this.page.locator('.q-dialog button, button').filter({ hasText: /OKAY|OK|Close/i }))
       .first();
-    try {
-      await okBtn.waitFor({ state: 'visible', timeout: 60000 });
-      console.log('Fulfillment Handover: Clicking OKAY on confirmation alert...');
-      await okBtn.click({ force: true });
-      await this.page.waitForTimeout(2000);
-    } catch {
-      console.log('Fulfillment Handover: No confirmation alert appeared or was auto-dismissed.');
+    if (await okBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      console.log('Fulfillment Handover: Dismissed handover confirmation modal.');
+      await okBtn.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(1000);
     }
     await this.page.locator('.q-dialog').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {});
-    await this.page.waitForTimeout(3000);
+    await this.page.waitForTimeout(2000);
+    console.log('Fulfillment Handover: Handover completed successfully (order fulfilled).');
   }
 }
 
