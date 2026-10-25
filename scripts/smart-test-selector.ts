@@ -241,6 +241,15 @@ export function selectTests(
       matched = true;
     }
 
+    // Agile user stories and generated test plans
+    if (file.includes('user-stories/') || file.includes('test-plans/') || file.includes('tests/generated/')) {
+      projects.add('ordering');
+      projects.add('fulfillment');
+      projects.add('e2e-bridge');
+      testFiles.add('tests/generated/');
+      matched = true;
+    }
+
     // API Fixtures
     if (file.includes('api/') || file.includes('schemas/')) {
       projects.add('ordering');

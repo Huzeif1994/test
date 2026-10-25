@@ -102,20 +102,8 @@ export class OrderingCheckoutPage extends BasePage {
     // Check if "Reserve a time slot" modal opened upon clicking Proceed to Checkout
     const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot/i }).first();
     if (await slotDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
-      console.log('Cart: "Reserve a time slot" dialog detected, waiting for available slots...');
-      const slotRadio = slotDialog.locator('.q-radio, [role="radio"]').first();
-      await slotRadio.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-      if (await slotRadio.isVisible().catch(() => false)) {
-        await slotRadio.click({ force: true });
-        await this.page.waitForTimeout(600);
-      }
-
-      const dialogProceedBtn = slotDialog.locator('button').filter({ hasText: /Proceed to Checkout/i }).first();
-      await dialogProceedBtn.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-      if (await dialogProceedBtn.isVisible().catch(() => false)) {
-        await dialogProceedBtn.scrollIntoViewIfNeeded().catch(() => {});
-        await dialogProceedBtn.click({ force: true }).catch(() => {});
-      }
+      console.log('Cart: "Reserve a time slot" dialog detected, selecting available slot...');
+      await this.selectFirstAvailableTimeSlot(slotDialog);
     }
 
     // Ensure transition to /checkout
@@ -123,14 +111,7 @@ export class OrderingCheckoutPage extends BasePage {
       if (this.page.url().includes('/checkout')) break;
       await this.page.waitForTimeout(1000);
       if (await slotDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-        const slotRadio = slotDialog.locator('.q-radio, [role="radio"]').first();
-        if (await slotRadio.isVisible().catch(() => false)) {
-          await slotRadio.click({ force: true }).catch(() => {});
-          await this.page.waitForTimeout(400);
-        }
-        const dialogProceedBtn = slotDialog.locator('button').filter({ hasText: /Proceed to Checkout/i }).first();
-        await dialogProceedBtn.scrollIntoViewIfNeeded().catch(() => {});
-        await dialogProceedBtn.click({ force: true }).catch(() => {});
+        await this.selectFirstAvailableTimeSlot(slotDialog);
       } else if (await btn.isVisible().catch(() => false)) {
         await btn.click().catch(() => btn.dispatchEvent('click'));
       }
@@ -142,12 +123,119 @@ export class OrderingCheckoutPage extends BasePage {
   }
 
   /**
+   * Intelligently select the first active/enabled time slot from the Reserve Slot dialog.
+   * If the current day's slots are all in the past/disabled, it shifts to the next available date tab.
+   */
+  async selectFirstAvailableTimeSlot(dialogLocator?: Locator): Promise<boolean> {
+    const dialog = dialogLocator || this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot|Select Slot|Time Slot/i }).first();
+    if (!(await dialog.isVisible({ timeout: 5000 }).catch(() => false))) {
+      return false;
+    }
+
+    // Wait for any inner spinner to detach and slots to load
+    await dialog.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    await this.page.waitForTimeout(600);
+
+    const findEnabledSlot = async (): Promise<Locator | null> => {
+      const radios = dialog.locator('.q-radio, [role="radio"]');
+      const count = await radios.count();
+      for (let i = 0; i < count; i++) {
+        const radio = radios.nth(i);
+        const isDisabled = await radio.evaluate((el) => {
+          const item = el.closest('.q-item') || el.closest('.q-list') || el;
+          const style = window.getComputedStyle(item);
+          const elStyle = window.getComputedStyle(el);
+          return (
+            item.classList.contains('disabled') ||
+            el.classList.contains('disabled') ||
+            item.getAttribute('aria-disabled') === 'true' ||
+            el.getAttribute('aria-disabled') === 'true' ||
+            item.hasAttribute('disabled') ||
+            el.hasAttribute('disabled') ||
+            style.pointerEvents === 'none' ||
+            elStyle.pointerEvents === 'none' ||
+            item.classList.contains('text-grey') ||
+            item.classList.contains('text-grey-5') ||
+            item.classList.contains('text-grey-6') ||
+            item.classList.contains('text-grey-7')
+          );
+        }).catch(() => true);
+
+        if (!isDisabled && await radio.isVisible().catch(() => false)) {
+          return radio;
+        }
+      }
+      return null;
+    };
+
+    let activeSlot = await findEnabledSlot();
+
+    // If no enabled slots found today (e.g. late in the day), click next date tab
+    if (!activeSlot) {
+      console.log('Reserve Slot Dialog: No available slots on current day. Looking for next available date tab...');
+      const dateTabs = dialog.locator('button, [role="tab"], .q-btn, .q-card, div.cursor-pointer')
+        .filter({ hasText: /\b(TODAY|TOMORROW|MON|TUE|WED|THU|FRI|SAT|SUN|\d{1,2})\b/i });
+
+      const tabCount = await dateTabs.count();
+      for (let t = 1; t < Math.min(tabCount, 5); t++) {
+        const tab = dateTabs.nth(t);
+        if (await tab.isVisible().catch(() => false)) {
+          console.log(`Reserve Slot Dialog: Switching to date tab #${t}...`);
+          await tab.click({ force: true }).catch(() => {});
+          await this.page.waitForTimeout(1200);
+          await dialog.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+          activeSlot = await findEnabledSlot();
+          if (activeSlot) break;
+        }
+      }
+    }
+
+    if (activeSlot) {
+      console.log('Reserve Slot Dialog: Selecting active time slot...');
+      await activeSlot.scrollIntoViewIfNeeded().catch(() => {});
+      await activeSlot.click({ force: true });
+      await this.page.waitForTimeout(600);
+    } else {
+      const fallbackRadio = dialog.locator('.q-radio, [role="radio"]').last();
+      if (await fallbackRadio.isVisible().catch(() => false)) {
+        console.log('Reserve Slot Dialog: Clicking fallback slot radio...');
+        await fallbackRadio.click({ force: true }).catch(() => {});
+        await this.page.waitForTimeout(600);
+      }
+    }
+
+    // Click confirm / proceed button in modal
+    const confirmBtn = dialog.locator('button, .q-btn')
+      .filter({ hasText: /Proceed To Checkout|Proceed to Checkout|Confirm|Save|Apply|Select|Done|Submit/i })
+      .first();
+
+    if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await confirmBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await confirmBtn.click({ force: true });
+      await dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+    }
+
+    // If dialog is still visible, try close button or Escape
+    if (await dialog.isVisible().catch(() => false)) {
+      const closeBtn = dialog.locator('button.q-btn:has(.q-icon:has-text("close")), button[aria-label="Close"], i:has-text("close")').first();
+      if (await closeBtn.isVisible().catch(() => false)) {
+        await closeBtn.click({ force: true }).catch(() => {});
+      } else {
+        await this.page.keyboard.press('Escape').catch(() => {});
+      }
+      await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+
+    return true;
+  }
+
+  /**
    * Wait for Checkout page sections to be fully interactive
    */
   async expectCheckoutLoaded(): Promise<void> {
     await this.page.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 35000 }).catch(() => {});
     await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 35000 }).catch(() => {});
-    const interactiveEl = this.page.locator('[role="switch"], [role="radio"], .q-radio, button').filter({ hasText: /Place Order|In Store|Curbside|Pay At Store/i }).first();
+    const interactiveEl = this.page.locator('[role="switch"], [role="radio"], .q-radio, button, h1, h2, h3').filter({ hasText: /Place Order|In Store|Curbside|Pay At Store|Order Details|Checkout/i }).first();
     await interactiveEl.waitFor({ state: 'visible', timeout: 30000 });
   }
 
@@ -545,35 +633,19 @@ export class OrderingCheckoutPage extends BasePage {
       .or(this.page.locator('button').filter({ hasText: /Select Slot/i }))
       .first();
 
-    const isPromptVisible = await selectSlotBtn.isVisible({ timeout: 2000 }).catch(() => false) ||
-      await slotNotice.isVisible({ timeout: 1500 }).catch(() => false);
+    const isPromptVisible = (await selectSlotBtn.isVisible({ timeout: 2000 }).catch(() => false)) ||
+      (await slotNotice.isVisible({ timeout: 1500 }).catch(() => false));
 
-    if (isPromptVisible && await selectSlotBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      console.log('Checkout: "Select Slot" detected, selecting available time slot...');
-      await selectSlotBtn.scrollIntoViewIfNeeded().catch(() => {});
-      await selectSlotBtn.click({ force: true });
-      await this.page.waitForTimeout(1000);
-
-      // In Quasar dialog, wait for available slot radio/chip (slots API takes ~3-4s to load)
-      const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot|Select Slot|Time Slot/i }).first();
-      const availableSlot = slotDialog.locator('.q-radio, [role="radio"]').first();
-
-      await availableSlot.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-      if (await availableSlot.isVisible().catch(() => false)) {
-        await availableSlot.click({ force: true });
-        await this.page.waitForTimeout(600);
-
-        // Click Proceed / Confirm / Save / Apply in the dialog
-        const confirmSlotBtn = slotDialog.locator('button')
-          .filter({ hasText: /Proceed to Checkout|Confirm|Save|Apply|Select|Done|Submit/i })
-          .first();
-
-        if (await confirmSlotBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-          await confirmSlotBtn.scrollIntoViewIfNeeded().catch(() => {});
-          await confirmSlotBtn.click({ force: true });
-          await this.page.waitForTimeout(1500);
-        }
+    if (isPromptVisible) {
+      if (await selectSlotBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('Checkout: "Select Slot" button detected, opening time slot dialog...');
+        await selectSlotBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await selectSlotBtn.click({ force: true });
+        await this.page.waitForTimeout(1000);
       }
+
+      const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot|Select Slot|Time Slot/i }).first();
+      await this.selectFirstAvailableTimeSlot(slotDialog);
     }
   }
 
@@ -583,7 +655,13 @@ export class OrderingCheckoutPage extends BasePage {
   async placeOrder(): Promise<void> {
     await this.placeOrderButton.waitFor({ state: 'visible', timeout: 15000 });
 
-    // Guard: If disabled, re-ensure terms, card, and time slot
+    // Guard: If time slot warning is present or button disabled, re-ensure time slot and terms
+    const timeSlotWarning = this.page.locator('text=/select your preferred time slot|select a time slot to continue|No time slot selected/i').first();
+    if (await timeSlotWarning.isVisible({ timeout: 1500 }).catch(() => false)) {
+      console.log('Place Order Guard: Unselected time slot detected, resolving time slot...');
+      await this.handleTimeSlotSelectionIfRequired();
+    }
+
     if (!(await this.placeOrderButton.isEnabled())) {
       await this.handleTimeSlotSelectionIfRequired();
       await this.acceptTerms();
@@ -693,6 +771,19 @@ export class OrderingCheckoutPage extends BasePage {
         await continueBtn.scrollIntoViewIfNeeded().catch(() => {});
         await continueBtn.click({ force: true });
         await this.page.waitForTimeout(1500);
+      }
+
+      if (step === 3) {
+        // If time slot warning is still visible, retry time slot selection and continue
+        const slotWarning = this.page.locator('text=/select your preferred time slot|select a time slot to continue|No time slot selected/i').first();
+        if (await slotWarning.isVisible({ timeout: 1500 }).catch(() => false)) {
+          console.log('Multi-step checkout: Slot warning still present on Step 3, re-attempting slot selection...');
+          await this.handleTimeSlotSelectionIfRequired();
+          if (await continueBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await continueBtn.click({ force: true });
+            await this.page.waitForTimeout(1500);
+          }
+        }
       }
     }
 
