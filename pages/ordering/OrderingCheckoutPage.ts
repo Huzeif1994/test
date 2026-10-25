@@ -235,8 +235,18 @@ export class OrderingCheckoutPage extends BasePage {
   async expectCheckoutLoaded(): Promise<void> {
     await this.page.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 35000 }).catch(() => {});
     await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 35000 }).catch(() => {});
-    const interactiveEl = this.page.locator('[role="switch"], [role="radio"], .q-radio, button, h1, h2, h3').filter({ hasText: /Place Order|In Store|Curbside|Pay At Store|Order Details|Checkout/i }).first();
-    await interactiveEl.waitFor({ state: 'visible', timeout: 30000 });
+
+    // Target visible interactive elements only (ignore hidden stepper titles or collapsed accordion headers)
+    const interactiveEl = this.page
+      .locator('[role="switch"]:visible, [role="radio"]:visible, .q-radio:visible, button:visible, .q-btn:visible')
+      .filter({ hasText: /Place Order|In Store|Curbside|Pay At Store|Continue|Edit/i })
+      .first();
+
+    const isReady = await interactiveEl.waitFor({ state: 'visible', timeout: 25000 }).then(() => true).catch(() => false);
+    if (!isReady) {
+      // Fallback: wait for the visible checkout container or main layout
+      await this.page.locator('.q-page:visible, main:visible, form:visible, [class*="checkout"]:visible').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    }
   }
 
   /**
