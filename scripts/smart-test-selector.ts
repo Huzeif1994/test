@@ -243,6 +243,7 @@ export function selectTests(
 
     // Agile user stories and generated test plans
     if (file.includes('user-stories/') || file.includes('test-plans/') || file.includes('tests/generated/')) {
+      projects.add('generated');
       projects.add('ordering');
       projects.add('fulfillment');
       projects.add('e2e-bridge');

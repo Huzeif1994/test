@@ -115,6 +115,14 @@ export default defineConfig({
       },
     },
     {
+      name: 'generated',
+      testDir: './tests/generated',
+      dependencies: ['setup-ordering', 'setup-fulfillment'],
+      use: {
+        ...desktopChrome,
+      },
+    },
+    {
       name: 'unit',
       testDir: './tests/unit',
     },
