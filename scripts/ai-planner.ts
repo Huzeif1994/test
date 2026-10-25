@@ -69,7 +69,7 @@ export function mapStepToPageObjects(stepText: string): { domain: 'ordering' | '
   };
 }
 
-export function parseUserStoryContent(markdown: string): UserStoryPlan {
+export function parseUserStoryContent(markdown: string, filePath?: string): UserStoryPlan {
   const lines = markdown.split(/\r?\n/);
 
   let id = 'US-UNKNOWN';
@@ -84,51 +84,80 @@ export function parseUserStoryContent(markdown: string): UserStoryPlan {
   const scenarios: PlanScenario[] = [];
   let currentScenario: PlanScenario | null = null;
 
+  // 1. Try extracting ID from filename if available
+  if (filePath) {
+    const fileBase = path.basename(filePath);
+    const fileIdMatch = fileBase.match(/^(US-[0-9A-Z]+)/i);
+    if (fileIdMatch) {
+      id = fileIdMatch[1].toUpperCase();
+    }
+  }
+
   for (const line of lines) {
     const trimmed = line.trim();
+    if (!trimmed) continue;
 
-    // Title & ID: e.g. # US-001: Customer Store Pickup...
+    // Title & ID: e.g. # US-001: Customer Store Pickup... OR # User Story: US-004 - ...
     if (trimmed.startsWith('# ')) {
-      const fullTitle = trimmed.substring(2).trim();
-      const idMatch = fullTitle.match(/^([A-Z]+-[0-9]+)\s*:\s*(.*)$/i);
-      if (idMatch) {
+      const fullHeader = trimmed.substring(2).trim();
+      const idMatch = fullHeader.match(/(US-[0-9A-Z]+)/i);
+      if (idMatch && id === 'US-UNKNOWN') {
         id = idMatch[1].toUpperCase();
-        title = idMatch[2].trim();
+      }
+      title = fullHeader.replace(/^(User Story:?\s*)?(US-[0-9A-Z]+\s*[:-]\s*)?/i, '').trim();
+    }
+
+    // Metadata items (with or without markdown bullets)
+    const idMeta = trimmed.match(/^[-*]?\s*\*\*ID:?\*\*\s*(.+)$/i) || trimmed.match(/^[-*]?\s*ID:\s*(.+)$/i);
+    if (idMeta) {
+      const idExtract = idMeta[1].trim().match(/(US-[0-9A-Z]+)/i);
+      if (idExtract) {
+        id = idExtract[1].toUpperCase();
       } else {
-        title = fullTitle;
+        id = idMeta[1].trim().toUpperCase();
       }
     }
 
-    // Metadata items
-    const idMeta = trimmed.match(/^\s*[-*]\s*\*\*ID:\*\*\s*(.+)$/i);
-    if (idMeta) id = idMeta[1].trim();
+    const titleMeta = trimmed.match(/^[-*]?\s*\*\*Title:?\*\*\s*(.+)$/i) || trimmed.match(/^[-*]?\s*Title:\s*(.+)$/i);
+    if (titleMeta) title = titleMeta[1].trim();
 
-    const personaMeta = trimmed.match(/^\s*[-*]\s*\*\*Persona:\*\*\s*(.+)$/i);
+    const personaMeta = trimmed.match(/^[-*]?\s*\*\*Persona:?\*\*\s*(.+)$/i) || trimmed.match(/^[-*]?\s*Persona:\s*(.+)$/i);
     if (personaMeta) persona = personaMeta[1].trim();
 
-    const priorityMeta = trimmed.match(/^\s*[-*]\s*\*\*Priority:\*\*\s*(.+)$/i);
+    const priorityMeta = trimmed.match(/^[-*]?\s*\*\*Priority:?\*\*\s*(.+)$/i) || trimmed.match(/^[-*]?\s*Priority:\s*(.+)$/i);
     if (priorityMeta) priority = priorityMeta[1].trim();
 
-    const projectsMeta = trimmed.match(/^\s*[-*]\s*\*\*Target Projects:\*\*\s*(.+)$/i);
+    const projectsMeta = trimmed.match(/^[-*]?\s*\*\*(Target Domain|Target Projects):?\*\*\s*(.+)$/i) ||
+                         trimmed.match(/^[-*]?\s*(Target Domain|Target Projects):\s*(.+)$/i);
     if (projectsMeta) {
-      const parts = projectsMeta[1].split(',').map(p => p.trim().toLowerCase());
+      const parts = projectsMeta[2].split(',').map(p => p.trim().toLowerCase());
       for (const p of parts) {
-        if (['ordering', 'fulfillment', 'admin', 'e2e-bridge', 'unit'].includes(p)) {
-          targetProjects.push(p as any);
+        if ((p.includes('ordering') || p.includes('storefront')) && !targetProjects.includes('ordering')) {
+          targetProjects.push('ordering');
+        }
+        if (p.includes('fulfillment') && !targetProjects.includes('fulfillment')) {
+          targetProjects.push('fulfillment');
+        }
+        if ((p.includes('admin') || p.includes('backoffice')) && !targetProjects.includes('admin')) {
+          targetProjects.push('admin');
+        }
+        if ((p.includes('bridge') || p.includes('e2e') || p.includes('cross-app')) && !targetProjects.includes('e2e-bridge')) {
+          targetProjects.push('e2e-bridge');
         }
       }
     }
 
     // Preconditions
-    if (trimmed.includes('.auth/ordering.json') && !authStates.includes('.auth/ordering.json')) {
+    if ((trimmed.includes('.auth/ordering.json') || trimmed.includes('customer is authenticated') || trimmed.includes('storefront')) && !authStates.includes('.auth/ordering.json')) {
       authStates.push('.auth/ordering.json');
     }
-    if (trimmed.includes('.auth/fulfillment.json') && !authStates.includes('.auth/fulfillment.json')) {
+    if ((trimmed.includes('.auth/fulfillment.json') || trimmed.includes('fulfillment')) && !authStates.includes('.auth/fulfillment.json')) {
       authStates.push('.auth/fulfillment.json');
     }
-    if (trimmed.includes('.auth/admin.json') && !authStates.includes('.auth/admin.json')) {
+    if ((trimmed.includes('.auth/admin.json') || trimmed.includes('admin')) && !authStates.includes('.auth/admin.json')) {
       authStates.push('.auth/admin.json');
     }
+
     const deviceMatch = trimmed.match(/Pixel\s*[0-9]+|iPhone\s*[a-zA-Z0-9]+|iPad|Desktop/i) || trimmed.match(/Mobile/i);
     if (deviceMatch && !devices.includes(deviceMatch[0])) {
       devices.push(deviceMatch[0]);
@@ -136,23 +165,30 @@ export function parseUserStoryContent(markdown: string): UserStoryPlan {
     const storeMatch = trimmed.match(/store branch `([^`]+)`/i);
     if (storeMatch) store = storeMatch[1];
 
-    // Scenario header: e.g. ## Scenario: Complete In-Store Pickup
-    const scenarioMatch = trimmed.match(/^##\s*Scenario:\s*(.+)$/i);
+    // Scenario header: e.g. ## Scenario: Complete In-Store Pickup OR ### Scenario 1: Verify Partial Loyalty...
+    const scenarioMatch = trimmed.match(/^#{2,4}\s*(Scenario\s*[0-9]*\s*:?)\s*(.+)$/i);
     if (scenarioMatch) {
       currentScenario = {
-        name: scenarioMatch[1].trim(),
+        name: scenarioMatch[2].trim(),
         steps: [],
       };
       scenarios.push(currentScenario);
       continue;
     }
 
-    // Gherkin Steps: - **GIVEN**, - **WHEN**, - **THEN**, - **AND**
-    const stepMatch = trimmed.match(/^[-*]\s*\*\*(GIVEN|WHEN|THEN|AND)\*\*\s*(.+)$/i);
+    // Gherkin Steps: - **GIVEN**, **Given**, - Given, Given, When, Then, And
+    const stepMatch = trimmed.match(/^[-*]?\s*(\*\*)?(GIVEN|WHEN|THEN|AND|BUT)(\*\*)?:?\s*(.+)$/i);
     if (stepMatch && currentScenario) {
-      const stepType = stepMatch[1].toUpperCase() as 'GIVEN' | 'WHEN' | 'THEN' | 'AND';
-      const stepText = stepMatch[2].trim();
+      const stepType = stepMatch[2].toUpperCase() as 'GIVEN' | 'WHEN' | 'THEN' | 'AND';
+      const stepText = stepMatch[4].trim();
       const mapped = mapStepToPageObjects(stepText);
+
+      // Auto-infer target project from step domain
+      if (mapped.domain === 'ordering' || mapped.domain === 'fulfillment' || mapped.domain === 'admin') {
+        if (!targetProjects.includes(mapped.domain)) {
+          targetProjects.push(mapped.domain);
+        }
+      }
 
       currentScenario.steps.push({
         type: stepType,
@@ -165,6 +201,7 @@ export function parseUserStoryContent(markdown: string): UserStoryPlan {
 
   // Fallback defaults
   if (targetProjects.length === 0) {
+    targetProjects.push('ordering');
     targetProjects.push('e2e-bridge');
   }
 
@@ -191,7 +228,7 @@ export function generateTestPlan(storyFilePath: string, outputDir: string = 'tes
   }
 
   const content = fs.readFileSync(fullPath, 'utf8');
-  const plan = parseUserStoryContent(content);
+  const plan = parseUserStoryContent(content, fullPath);
 
   const targetDir = path.resolve(outputDir);
   if (!fs.existsSync(targetDir)) {

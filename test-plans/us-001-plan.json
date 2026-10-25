@@ -10,10 +10,12 @@
   ],
   "preconditions": {
     "authStates": [
-      ".auth/ordering.json",
-      ".auth/fulfillment.json"
+      ".auth/fulfillment.json",
+      ".auth/ordering.json"
     ],
-    "devices": [],
+    "devices": [
+      "Desktop"
+    ],
     "store": "Madison01"
   },
   "scenarios": [
@@ -42,7 +44,8 @@
           "text": "Customer selects \"In Store Pickup\", turns off \"Pay At Store\", and selects \"Credit or Debit Card\"",
           "targetDomain": "ordering",
           "suggestedPageObjects": [
-            "OrderingCheckoutPage"
+            "OrderingCheckoutPage",
+            "PickOrderDetailPage"
           ]
         },
         {
@@ -105,5 +108,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-10-24T15:51:22.884Z"
+  "generatedAt": "2026-10-25T07:44:28.467Z"
 }

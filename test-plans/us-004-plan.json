@@ -1,0 +1,99 @@
+{
+  "id": "US-004",
+  "title": "Customer Loyalty Points Redemption at Checkout",
+  "persona": "Customer",
+  "priority": "High",
+  "targetProjects": [
+    "ordering",
+    "e2e-bridge",
+    "admin",
+    "shared"
+  ],
+  "preconditions": {
+    "authStates": [
+      ".auth/ordering.json",
+      ".auth/fulfillment.json"
+    ],
+    "devices": []
+  },
+  "scenarios": [
+    {
+      "name": "Verify Partial Loyalty Points Redemption During Checkout and After Order Placement",
+      "steps": [
+        {
+          "type": "GIVEN",
+          "text": "the customer is logged in to the storefront and navigates to the product catalog",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCatalogPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "the customer adds the product **\"Clipper Refillable Lighter\"** to the cart",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCatalogPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "navigates to the Cart page",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCatalogPage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "enters **$0.01** in the Loyalty Points Redemption section",
+          "targetDomain": "admin",
+          "suggestedPageObjects": [
+            "AdminCustomerDetailPage"
+          ]
+        },
+        {
+          "type": "THEN",
+          "text": "the checkout summary should display a loyalty discount of **$0.01**",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "WHEN",
+          "text": "the customer accepts the terms and conditions and submits the order",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "OrderingCheckoutPage"
+          ]
+        },
+        {
+          "type": "THEN",
+          "text": "the order should be placed successfully",
+          "targetDomain": "shared",
+          "suggestedPageObjects": [
+            "BasePage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "the order confirmation details should reflect the **$0.01** loyalty discount",
+          "targetDomain": "shared",
+          "suggestedPageObjects": [
+            "BasePage"
+          ]
+        },
+        {
+          "type": "AND",
+          "text": "the customer's Orders page should display the same **$0.01** loyalty discount for the placed order.",
+          "targetDomain": "ordering",
+          "suggestedPageObjects": [
+            "BasePage"
+          ]
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-10-25T07:44:28.479Z"
+}

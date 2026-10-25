@@ -11,10 +11,13 @@
   ],
   "preconditions": {
     "authStates": [
-      ".auth/ordering.json",
-      ".auth/fulfillment.json"
+      ".auth/fulfillment.json",
+      ".auth/admin.json",
+      ".auth/ordering.json"
     ],
-    "devices": []
+    "devices": [
+      "Desktop"
+    ]
   },
   "scenarios": [
     {
@@ -71,5 +74,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-10-24T15:51:22.893Z"
+  "generatedAt": "2026-10-25T07:44:28.477Z"
 }

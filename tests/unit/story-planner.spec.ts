@@ -95,8 +95,9 @@ test.describe('Agile Story Planner — Unit Test Suite', () => {
     const tmpStoryPath = path.resolve('user-stories', 'US-TMP-TEST.md');
     fs.writeFileSync(tmpStoryPath, sampleMarkdown, 'utf8');
 
+    let outPath = '';
     try {
-      const outPath = generateTestPlan(tmpStoryPath);
+      outPath = generateTestPlan(tmpStoryPath);
       expect(fs.existsSync(outPath)).toBeTruthy();
 
       const raw = fs.readFileSync(outPath, 'utf8');
@@ -105,6 +106,7 @@ test.describe('Agile Story Planner — Unit Test Suite', () => {
       expect(json.scenarios[0].steps.length).toBe(6);
     } finally {
       if (fs.existsSync(tmpStoryPath)) fs.unlinkSync(tmpStoryPath);
+      if (outPath && fs.existsSync(outPath)) fs.unlinkSync(outPath);
     }
   });
 });

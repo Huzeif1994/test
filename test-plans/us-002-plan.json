@@ -10,11 +10,12 @@
   ],
   "preconditions": {
     "authStates": [
-      ".auth/ordering.json",
-      ".auth/fulfillment.json"
+      ".auth/fulfillment.json",
+      ".auth/ordering.json"
     ],
     "devices": [
       "Mobile",
+      "Pixel 5",
       "mobile"
     ]
   },
@@ -36,7 +37,8 @@
           "targetDomain": "ordering",
           "suggestedPageObjects": [
             "OrderingCatalogPage",
-            "OrderingCheckoutPage"
+            "OrderingCheckoutPage",
+            "PickOrderDetailPage"
           ]
         },
         {
@@ -53,7 +55,8 @@
           "text": "Fulfillment employee opens Pending Orders, picks all items, and marks order Ready",
           "targetDomain": "fulfillment",
           "suggestedPageObjects": [
-            "PendingOrdersPage"
+            "PendingOrdersPage",
+            "PickOrderDetailPage"
           ]
         },
         {
@@ -69,7 +72,8 @@
           "text": "Customer verifies \"Ready For Pickup\" status and completes mobile vehicle arrival submission with Spot \"Spot - A\", Color \"Black\", Maker \"Acura\", Model \"CL\"",
           "targetDomain": "ordering",
           "suggestedPageObjects": [
-            "OrderingCheckoutPage"
+            "OrderingCheckoutPage",
+            "PickOrderDetailPage"
           ]
         },
         {
@@ -86,7 +90,8 @@
           "text": "Fulfillment employee verifies Curbside Pickup method and Parking Spot / Car Info blocks",
           "targetDomain": "ordering",
           "suggestedPageObjects": [
-            "OrderingCheckoutPage"
+            "OrderingCheckoutPage",
+            "PickOrderDetailPage"
           ]
         },
         {
@@ -100,5 +105,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-10-24T15:51:22.890Z"
+  "generatedAt": "2026-10-25T07:44:28.473Z"
 }
