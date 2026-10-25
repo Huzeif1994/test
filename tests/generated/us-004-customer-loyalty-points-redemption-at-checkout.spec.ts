@@ -58,48 +58,43 @@ test.describe('US-004: Customer Loyalty Points Redemption at Checkout', () => {
 
     try {
       await test.step('GIVEN: the customer is logged in to the storefront and navigates to the product catalog', async () => {
-        // Step: the customer is logged in to the storefront and navigates to the product catalog
-              await customerPage.waitForTimeout(1000);
+        await catalogPage.gotoCategory('huzeif-test');
       });
 
       await test.step('WHEN: the customer adds the product **"Clipper Refillable Lighter"** to the cart', async () => {
-        // Step: the customer adds the product **"Clipper Refillable Lighter"** to the cart
-              await customerPage.waitForTimeout(1000);
+        await catalogPage.addProductToCart('Clipper Refillable Lighter');
       });
 
       await test.step('AND: navigates to the Cart page', async () => {
-        // Step: navigates to the Cart page
-              await customerPage.waitForTimeout(1000);
+        await catalogPage.openCartAndProceed();
+              await checkoutPage.proceedToCheckout();
       });
 
       await test.step('AND: enters **$0.01** in the Loyalty Points Redemption section', async () => {
-        // Step: enters **$0.01** in the Loyalty Points Redemption section
-              await customerPage.waitForTimeout(1000);
+        await checkoutPage.applyLoyaltyDiscount('0.01');
       });
 
       await test.step('THEN: the checkout summary should display a loyalty discount of **$0.01**', async () => {
-        // Step: the checkout summary should display a loyalty discount of **$0.01**
-              await customerPage.waitForTimeout(1000);
+        await checkoutPage.verifyLoyaltyDiscount('0.01');
       });
 
       await test.step('WHEN: the customer accepts the terms and conditions and submits the order', async () => {
-        // Step: the customer accepts the terms and conditions and submits the order
-              await customerPage.waitForTimeout(1000);
+        await checkoutPage.acceptTerms();
+              await checkoutPage.placeOrder();
       });
 
       await test.step('THEN: the order should be placed successfully', async () => {
-        // Step: the order should be placed successfully
-              await customerPage.waitForTimeout(1000);
+        placedOrderNumber = await checkoutPage.getLatestOrderNumber();
+              console.log('Placed order number verified:', placedOrderNumber);
+              expect(placedOrderNumber).toBeTruthy();
       });
 
       await test.step('AND: the order confirmation details should reflect the **$0.01** loyalty discount', async () => {
-        // Step: the order confirmation details should reflect the **$0.01** loyalty discount
-              await customerPage.waitForTimeout(1000);
+        await checkoutPage.verifyOrderConfirmationLoyalty('0.01');
       });
 
       await test.step('AND: the customer\'s Orders page should display the same **$0.01** loyalty discount for the placed order.', async () => {
-        // Step: the customer's Orders page should display the same **$0.01** loyalty discount for the placed order.
-              await customerPage.waitForTimeout(1000);
+        await checkoutPage.verifyLoyaltyDiscount('0.01');
       });
 
     } finally {

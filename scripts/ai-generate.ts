@@ -12,16 +12,62 @@ export function translateStepToPOM(step: PlanStep): string {
   const text = step.text;
 
   // Ordering steps
+  if (/navigates? to.*product catalog|opens? catalog|browses? catalog/i.test(text)) {
+    return `await catalogPage.gotoCategory('huzeif-test');`;
+  }
+
   if (/clears shopping cart/i.test(text) && /category/i.test(text)) {
     const catMatch = text.match(/["']([^"']+)["']\s*category/i) || text.match(/category\s*["']?([^"']+)["']?/i);
     const cat = catMatch ? catMatch[1] : 'huzeif-test';
     return `await checkoutPage.clearCartIfNotEmpty();\n      await catalogPage.gotoCategory('${cat}');`;
   }
 
-  if (/adds?.*product to cart/i.test(text) && /checkout/i.test(text)) {
-    const prodMatch = text.match(/["']([^"']+)["']/);
-    const prod = prodMatch ? prodMatch[1] : 'CASA TURRENT SERIE 1973 ROBUSTO';
+  if (/adds?.*product.*to.*cart/i.test(text) && /checkout/i.test(text)) {
+    const prodMatch = text.match(/["'\*]+([^"'\*]+)["'\*]+/);
+    const prod = prodMatch ? prodMatch[1] : 'Clipper Refillable Lighter';
     return `await catalogPage.addProductToCart('${prod}');\n      await catalogPage.openCartAndProceed();\n      await checkoutPage.proceedToCheckout();`;
+  }
+
+  if (/adds?.*product.*to.*cart/i.test(text)) {
+    const prodMatch = text.match(/["'\*]+([^"'\*]+)["'\*]+/);
+    const prod = prodMatch ? prodMatch[1] : 'Clipper Refillable Lighter';
+    return `await catalogPage.addProductToCart('${prod}');`;
+  }
+
+  if (/navigates? to.*Cart page|opens? Cart|proceeds? to cart/i.test(text)) {
+    return `await catalogPage.openCartAndProceed();\n      await checkoutPage.proceedToCheckout();`;
+  }
+
+  if (/Loyalty Points|loyalty.*redemption|enters?.*loyalty/i.test(text)) {
+    const amountMatch = text.match(/\$([0-9.]+)/) || text.match(/([0-9.]+)\s*(points?|dollars?)/i);
+    const amount = amountMatch ? amountMatch[1] : '0.01';
+    return `await checkoutPage.applyLoyaltyDiscount('${amount}');`;
+  }
+
+  if (/checkout summary.*loyalty discount|displays?.*loyalty discount/i.test(text)) {
+    const amountMatch = text.match(/\$([0-9.]+)/);
+    const amount = amountMatch ? amountMatch[1] : '0.01';
+    return `await checkoutPage.verifyLoyaltyDiscount('${amount}');`;
+  }
+
+  if (/accepts?.*terms.*submits?.*order|submits?.*order/i.test(text)) {
+    return `await checkoutPage.acceptTerms();\n      await checkoutPage.placeOrder();`;
+  }
+
+  if (/order.*placed successfully|order.*placed/i.test(text)) {
+    return `placedOrderNumber = await checkoutPage.getLatestOrderNumber();\n      console.log('Placed order number verified:', placedOrderNumber);\n      expect(placedOrderNumber).toBeTruthy();`;
+  }
+
+  if (/order confirmation.*reflect.*loyalty|confirmation.*loyalty/i.test(text)) {
+    const amountMatch = text.match(/\$([0-9.]+)/);
+    const amount = amountMatch ? amountMatch[1] : '0.01';
+    return `await checkoutPage.verifyOrderConfirmationLoyalty('${amount}');`;
+  }
+
+  if (/Orders page.*loyalty discount/i.test(text)) {
+    const amountMatch = text.match(/\$([0-9.]+)/);
+    const amount = amountMatch ? amountMatch[1] : '0.01';
+    return `await checkoutPage.verifyOrderHistoryLoyalty(placedOrderNumber, '${amount}');`;
   }
 
   if (/In Store Pickup/i.test(text) && /Pay At Store/i.test(text)) {
