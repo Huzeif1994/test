@@ -168,7 +168,9 @@ The repository runs a multi-stage workflow on every push to `main`, pull request
 
 ```mermaid
 flowchart TD
-    A[Push / PR / Schedule / Manual] --> B[Phase 1: test Matrix]
+    A[Push / PR / Schedule / Manual] --> QG[Phase 0: Quality Gate<br/>Typecheck + 37 Unit Tests + Smart Selector]
+    
+    QG --> B[Phase 1: Application Matrix]
     subgraph Phase1 [Phase 1: 3 Parallel Matrix Jobs]
         B1[Ordering Tests]
         B2[Admin Tests]
@@ -178,7 +180,7 @@ flowchart TD
     B --> B2
     B --> B3
     
-    B1 & B2 & B3 --> C[Phase 2: e2e-bridge]
+    QG & B1 & B2 & B3 --> C[Phase 2: e2e-bridge]
     note1[Dedicated dependent runner\nPrevents concurrent cart collisions] -.-> C
     
     C --> D[Phase 3: allure-report & deploy-report]
@@ -190,16 +192,16 @@ flowchart TD
     end
     D --> D1 --> D2 --> D3 --> D4
     
-    B --> E[Phase 4: Docker Smoke Test]
+    QG --> E[Phase 4: Docker Smoke Test]
     subgraph Phase4 [Phase 4: Container Verification]
         E1[Build Image playwright-huzeif:ci]
         E2[Run Admin Smoke Test in Container]
     end
     E --> E1 --> E2
     
-    D & E --> F[Phase 5: Notification & Summary]
+    D & E --> F[Phase 5: Notification & Diagnostics]
     subgraph Phase5 [Phase 5: Status Dispatch]
-        F1[Publish Markdown Job Summary]
+        F1[Publish Per-Job Markdown Summary]
         F2[Send Formatted HTML Email via Office 365]
     end
     F --> F1

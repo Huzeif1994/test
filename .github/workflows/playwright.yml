@@ -5,9 +5,9 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  workflow_dispatch:        # manual run ke liye
+  workflow_dispatch:        # manual run
   schedule:
-    - cron: '45 6 * * *'   # roz dopahar 12:15 PM IST (06:45 UTC)
+    - cron: '45 6 * * *'   # 12:15 PM IST (06:45 UTC) daily
 
 env:
   TEST_ENV: ${{ vars.TEST_ENV || 'dev' }}
@@ -35,9 +35,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Job 1: Normal run (Docker ke bina), 3 apps parallel
+  # Phase 0: Prerequisite Quality Gate (Fast-Fail: Typecheck + 37 Unit Tests + Smart Selector)
+  quality-gate:
+    name: Quality Gate (Typecheck & Unit Tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browser binary for unit tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Enforce Strict Quality Gate (tsc + 37 Unit Tests + Smart Selector Validation)
+        run: npm run quality:gate
+        env:
+          SKIP_CREDENTIAL_CHECK: 'true'
+
+  # Phase 1: Standalone Application Matrix (Runs in parallel across 3 projects)
   test:
     name: Tests (${{ matrix.project }})
+    needs: quality-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -49,7 +73,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 22.x
           cache: npm
 
       - run: npm ci
@@ -57,17 +81,13 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Enforce Quality Gate (Typecheck + 24 Unit Tests + Mapping Validation)
-        run: npm run quality:gate
-        env:
-          SKIP_CREDENTIAL_CHECK: 'true'
-
       - name: Run tests
         run: npx playwright test --project=${{ matrix.project }}
 
-      - name: AI Autonomous Defect & Blast Radius Triage
+      - name: Automated Defect & Blast Radius Triage
         if: ${{ !cancelled() }}
-        run: npm run report:bug || true
+        continue-on-error: true
+        run: npm run report:bug
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -78,7 +98,7 @@ jobs:
             test-results/
           retention-days: 14
 
-      # Allure ke raw results (agle job mein teeno browsers ke results jodenge)
+      # Raw Allure results for downstream combined report
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -87,10 +107,10 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # Job 1.5: Cross-App E2E Bridge (Runs after ordering to prevent shared storefront cart collision)
+  # Phase 2: Cross-App E2E Bridge (Sequential runner to eliminate shared cart collision)
   e2e-bridge:
     name: Tests (e2e-bridge)
-    needs: test
+    needs: [quality-gate, test]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -99,7 +119,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 22.x
           cache: npm
 
       - run: npm ci
@@ -110,9 +130,10 @@ jobs:
       - name: Run E2E Bridge tests
         run: npx playwright test --project=e2e-bridge
 
-      - name: AI Autonomous Defect & Blast Radius Triage
+      - name: Automated Defect & Blast Radius Triage
         if: ${{ !cancelled() }}
-        run: npm run report:bug || true
+        continue-on-error: true
+        run: npm run report:bug
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -131,7 +152,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # Job 2: Teeno browsers ke Allure results jodke ek report banao
+  # Phase 3: Allure Aggregation with Historical Trend Retention
   allure-report:
     name: Allure report
     needs: [test, e2e-bridge]
@@ -143,7 +164,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 22.x
           cache: npm
 
       - run: npm ci
@@ -191,14 +212,14 @@ jobs:
           path: allure-report/
           retention-days: 14
 
-      # GitHub Pages par publish (PR par nahi, sirf main/schedule/manual)
+      # GitHub Pages publish artifact (main/schedule/manual only, not on PR)
       - name: Upload Pages artifact
         if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: allure-report/
 
-  # Job 3: GitHub Pages deploy (link: https://<username>.github.io/<repo>/)
+  # Phase 3.5: GitHub Pages Deployment (Live: https://<username>.github.io/<repo>/)
   deploy-report:
     name: Publish report to GitHub Pages
     needs: allure-report
@@ -215,9 +236,10 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  # Job 4: Docker Smoke Verification (Isolated Container Runtime)
+  # Phase 4: Containerized Verification (Docker Smoke Test)
   docker:
     name: Docker Smoke Test (Admin Portal)
+    needs: quality-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -271,7 +293,6 @@ jobs:
             test-results/
           retention-days: 14
 
-      # Docker run ke Allure results (alag naam, taaki main combined report mein na mile)
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -280,17 +301,22 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # Job 5: Send Status Notification via Email & Add Summary
+  # Phase 5: Notification & Per-Job Diagnostics Summary
   notify:
     name: Notification & Summary
-    needs: [test, e2e-bridge, allure-report, deploy-report, docker]
+    needs: [quality-gate, test, e2e-bridge, allure-report, deploy-report, docker]
     if: always()
     runs-on: ubuntu-24.04
     steps:
-      - name: Calculate test outcome
+      - name: Calculate composite pipeline outcome
         id: outcome
         run: |
-          if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.e2e-bridge.result }}" = "success" ] && [ "${{ needs.docker.result }}" = "success" ]; then
+          QG_STATUS="${{ needs.quality-gate.result }}"
+          TEST_STATUS="${{ needs.test.result }}"
+          BRIDGE_STATUS="${{ needs.e2e-bridge.result }}"
+          DOCKER_STATUS="${{ needs.docker.result }}"
+
+          if [ "$QG_STATUS" = "success" ] && [ "$TEST_STATUS" = "success" ] && [ "$BRIDGE_STATUS" = "success" ] && [ "$DOCKER_STATUS" = "success" ]; then
             echo "status_title=PASSED" >> $GITHUB_OUTPUT
             echo "status_color=#28a745" >> $GITHUB_OUTPUT
             echo "status_badge=✅ SUCCESS" >> $GITHUB_OUTPUT
@@ -300,7 +326,7 @@ jobs:
             echo "status_badge=❌ FAILURE" >> $GITHUB_OUTPUT
           fi
 
-      - name: Publish GitHub Actions Job Summary
+      - name: Publish GitHub Actions Job Summary with Per-Job Diagnostics
         run: |
           echo "## 🧪 Playwright CI/CD Test Run Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -309,12 +335,22 @@ jobs:
           echo "| **Overall Status** | ${{ steps.outcome.outputs.status_badge }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Environment** | \`${{ env.TEST_ENV }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Branch / Ref** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Triggered By** | @${{ github.actor }} (${{ github.event_name }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Apps Tested** | Online Ordering, Admin Portal, Fulfillment App, Cross-App E2E Bridge |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Per-Job Execution Breakdown:" >> $GITHUB_STEP_SUMMARY
+          echo "| Pipeline Phase | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🛡️ **Quality Gate (Typecheck + 37 Unit Tests)** | \`${{ needs.quality-gate.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 **Matrix Tests (Ordering, Admin, Fulfillment)** | \`${{ needs.test.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌉 **Cross-App E2E Bridge** | \`${{ needs.e2e-bridge.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🐳 **Docker Smoke Verification** | \`${{ needs.docker.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📊 **Allure Compilation** | \`${{ needs.allure-report.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 **GitHub Pages Publishing** | \`${{ needs.deploy-report.result }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Reports:" >> $GITHUB_STEP_SUMMARY
           echo "- 🌐 **[Live Allure Report (GitHub Pages)](https://huzeif1994.github.io/test/)**" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 Downloadable HTML artifacts are listed below under **Artifacts**." >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Downloadable HTML and trace artifacts are available below." >> $GITHUB_STEP_SUMMARY
 
       - name: Send status email via Outlook
         if: ${{ env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
@@ -366,6 +402,7 @@ jobs:
                     <tr><td class="label">Branch:</td><td>${{ github.ref_name }}</td></tr>
                     <tr><td class="label">Commit:</td><td><code>${{ github.sha }}</code></td></tr>
                     <tr><td class="label">Triggered By:</td><td>${{ github.actor }} (${{ github.event_name }})</td></tr>
+                    <tr><td class="label">Quality Gate:</td><td>${{ needs.quality-gate.result }}</td></tr>
                     <tr><td class="label">Apps Tested:</td><td>Online Ordering, Admin Portal, Fulfillment App, Cross-App E2E Bridge</td></tr>
                   </table>
                   <div>
