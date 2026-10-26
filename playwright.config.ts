@@ -46,15 +46,20 @@ export default defineConfig({
         : ['--window-size=1366,768', '--no-sandbox', '--disable-setuid-sandbox'],
     },
 
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'on',
+    video: 'retain-on-failure',
   },
 
   projects: [
     {
+      name: 'setup-preflight',
+      testMatch: /preflight\.setup\.ts/,
+    },
+    {
       name: 'setup-fulfillment',
       testMatch: /auth\.fulfillment\.setup\.ts/,
+      dependencies: ['setup-preflight'],
       use: {
         ...desktopChrome,
         baseURL: config.fulfillment.baseUrl,
@@ -63,6 +68,7 @@ export default defineConfig({
     {
       name: 'setup-admin',
       testMatch: /auth\.admin\.setup\.ts/,
+      dependencies: ['setup-preflight'],
       use: {
         ...desktopChrome,
         baseURL: config.admin.baseUrl,
@@ -71,6 +77,7 @@ export default defineConfig({
     {
       name: 'setup-ordering',
       testMatch: /auth\.ordering\.setup\.ts/,
+      dependencies: ['setup-preflight'],
       use: {
         ...desktopChrome,
         baseURL: config.ordering.baseUrl,

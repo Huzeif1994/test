@@ -27,6 +27,12 @@ test.describe('Automated Defect Reporter & Blast Radius Triage — Unit Test Sui
     expect(res.suggestedSeverity).toBe('Medium (Suggested)');
   });
 
+  test('should classify pre-flight outages and gateway errors as ENVIRONMENT_ISSUE with High severity', () => {
+    const res = classifyError('🛑 [PRE-FLIGHT OUTAGE] Online Ordering Storefront is UNREACHABLE: ECONNREFUSED');
+    expect(res.classification).toBe('ENVIRONMENT_ISSUE');
+    expect(res.suggestedSeverity).toBe('High (Suggested)');
+  });
+
   test('should compute blast radius risk accurately based on defect classifications', () => {
     // Clean run
     const clean = computeBlastRadius([]);

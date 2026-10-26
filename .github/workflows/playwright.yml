@@ -3,8 +3,18 @@ name: Playwright Tests
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'reports/**'
+      - 'docs/**'
+      - '.gitignore'
   pull_request:
     branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'reports/**'
+      - 'docs/**'
+      - '.gitignore'
   workflow_dispatch:        # manual run
   schedule:
     - cron: '45 6 * * *'   # 12:15 PM IST (06:45 UTC) daily
@@ -32,7 +42,7 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   # Phase 0: Prerequisite Quality Gate (Fast-Fail: Typecheck + 37 Unit Tests + Smart Selector)
@@ -50,9 +60,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Install Playwright browser binary for unit tests
-        run: npx playwright install --with-deps chromium
-
+      # Unit tests run in pure Node.js (tsc + Playwright unit project). No browser binary needed.
       - name: Enforce Strict Quality Gate (tsc + 37 Unit Tests + Smart Selector Validation)
         run: npm run quality:gate
         env:
@@ -77,6 +85,12 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Cache Playwright browser binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
@@ -123,6 +137,12 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Cache Playwright browser binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium

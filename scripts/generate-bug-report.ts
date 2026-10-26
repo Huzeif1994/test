@@ -26,7 +26,18 @@ export function classifyError(errorMsg: string): {
   suggestedSeverity: BugReportData['suggestedSeverity'];
 } {
   const lower = (errorMsg || '').toLowerCase();
-  if (lower.includes('500 internal') || lower.includes('crash') || lower.includes('502 bad gateway') || lower.includes('failed to fetch')) {
+  if (
+    lower.includes('pre-flight outage') ||
+    lower.includes('502 bad gateway') ||
+    lower.includes('503 service') ||
+    lower.includes('504 gateway') ||
+    lower.includes('econnrefused') ||
+    lower.includes('unreachable') ||
+    lower.includes('catalog resilience')
+  ) {
+    return { classification: 'ENVIRONMENT_ISSUE', suggestedSeverity: 'High (Suggested)' };
+  }
+  if (lower.includes('500 internal') || lower.includes('crash') || lower.includes('failed to fetch') || lower.includes('unhandled rejection')) {
     return { classification: 'APPLICATION_BUG', suggestedSeverity: 'High (Suggested)' };
   }
   if (lower.includes('strict mode violation') || lower.includes('resolved to') || lower.includes('not visible') || lower.includes('detached')) {
