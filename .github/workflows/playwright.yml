@@ -111,7 +111,7 @@ jobs:
   e2e-bridge:
     name: Tests (e2e-bridge)
     needs: [quality-gate, test]
-    if: ${{ !cancelled() }}
+    if: ${{ success() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
