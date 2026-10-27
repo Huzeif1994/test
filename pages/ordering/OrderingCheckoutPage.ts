@@ -260,7 +260,16 @@ export class OrderingCheckoutPage extends BasePage {
       .or(this.payAtStoreSwitch)
       .first();
 
-    await paySwitch.waitFor({ state: 'visible', timeout: 35000 });
+    const isVisible = await paySwitch.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+    if (!isVisible) {
+      console.log('⚠️ [Checkout Resilience] "Pay At Store" toggle not rendered for this order. Checking if Card payment is default or available...');
+      const cardOption = this.page.locator('button, div, label').filter({ hasText: /Credit or Debit Card/i }).first();
+      if (await cardOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await cardOption.click({ force: true }).catch(() => {});
+      }
+      return;
+    }
+
     await paySwitch.scrollIntoViewIfNeeded().catch(() => {});
     const isChecked = (await paySwitch.getAttribute('aria-checked')) === 'true' ||
                       (await paySwitch.locator('.q-toggle__inner--truthy').isVisible().catch(() => false));

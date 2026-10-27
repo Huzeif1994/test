@@ -152,6 +152,7 @@ export function selectTests(
     'pages/BasePage.ts',
     'utils/',
     '.github/',
+    'tests/setup/',
   ];
 
   for (const file of changedFiles) {
