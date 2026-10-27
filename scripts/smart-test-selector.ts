@@ -1,4 +1,5 @@
 import { execSync, spawnSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 
 export interface SelectionResult {
@@ -295,12 +296,69 @@ if (require.main === module) {
   const shouldRun = args.includes('--run');
   const asJson = args.includes('--json');
   const isHeaded = args.includes('--headed');
+  const isCi = args.includes('--ci');
 
   const diffResult = getChangedFiles();
-  const selection = selectTests(diffResult.files, {
+  let selection = selectTests(diffResult.files, {
     isGitTrusted: diffResult.isGitTrusted,
     failureReason: diffResult.failureReason,
   });
+
+  // Handle explicit TEST_SCOPE override if provided (e.g. via workflow_dispatch)
+  const testScope = process.env.TEST_SCOPE?.trim().toLowerCase();
+  if (testScope && testScope !== 'smart') {
+    if (testScope === 'full') {
+      selection.allTests = true;
+      selection.reason = 'Manual full regression override requested via TEST_SCOPE=full.';
+    } else if (['ordering', 'admin', 'fulfillment'].includes(testScope)) {
+      selection.allTests = false;
+      selection.projects = new Set([testScope]);
+      selection.reason = `Manual targeted test scope override requested via TEST_SCOPE=${testScope}.`;
+    } else if (testScope === 'e2e-bridge') {
+      selection.allTests = false;
+      selection.projects = new Set(['e2e-bridge']);
+      selection.reason = 'Manual E2E bridge test scope override requested via TEST_SCOPE=e2e-bridge.';
+    }
+  }
+
+  if (isCi) {
+    const allStandalone = ['ordering', 'admin', 'fulfillment'];
+    let matrixProjects: string[] = [];
+
+    if (selection.allTests) {
+      matrixProjects = allStandalone;
+    } else {
+      matrixProjects = allStandalone.filter(p => selection.projects.has(p));
+      if (matrixProjects.length === 0 && !selection.docsOnly && !selection.projects.has('e2e-bridge')) {
+        matrixProjects = allStandalone;
+      }
+    }
+
+    const runBridge = selection.allTests || selection.projects.has('e2e-bridge');
+    const runTests = !selection.docsOnly && (matrixProjects.length > 0 || runBridge);
+    const runId = process.env.RUN_ID || process.env.GITHUB_RUN_ID || `run_${Date.now()}`;
+
+    console.log('\n==================================================');
+    console.log('🤖 SMART TEST SELECTOR — CI Pipeline Configuration');
+    console.log('==================================================');
+    console.log(`📋 Changed Files Count: ${diffResult.files.length}`);
+    console.log(`💡 Selection Reason: ${selection.reason}`);
+    console.log(`🚀 Matrix Projects: ${JSON.stringify(matrixProjects)}`);
+    console.log(`🌉 Run E2E Bridge: ${runBridge}`);
+    console.log(`🧪 Run Tests: ${runTests}`);
+    console.log(`🆔 Run ID: ${runId}`);
+    console.log('==================================================\n');
+
+    if (process.env.GITHUB_OUTPUT) {
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix_projects=${JSON.stringify(matrixProjects)}\n`);
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `run_bridge=${runBridge ? 'true' : 'false'}\n`);
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `run_tests=${runTests ? 'true' : 'false'}\n`);
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `selection_reason=${selection.reason}\n`);
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `run_id=${runId}\n`);
+    }
+
+    process.exit(0);
+  }
 
   if (asJson) {
     console.log(
@@ -359,7 +417,7 @@ if (require.main === module) {
 
     // Forward any extra passthrough arguments
     for (const arg of args) {
-      if (!['--run', '--json', '--headed', '--list'].includes(arg)) {
+      if (!['--run', '--json', '--headed', '--list', '--ci'].includes(arg)) {
         playwrightArgs.push(arg);
       }
     }

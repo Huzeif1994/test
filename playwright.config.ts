@@ -1,5 +1,25 @@
 import { defineConfig, devices } from '@playwright/test';
+import fs from 'fs';
 import { config } from './config/environment';
+
+const runId = process.env.RUN_ID || process.env.GITHUB_RUN_ID || `run_${Date.now()}`;
+process.env.RUN_ID = runId;
+
+// Inject execution metadata and runId into Allure environment.properties
+try {
+  if (!fs.existsSync('allure-results')) {
+    fs.mkdirSync('allure-results', { recursive: true });
+  }
+  const envContent = [
+    `RunId=${runId}`,
+    `Environment=${process.env.TEST_ENV || 'dev'}`,
+    `NodeVersion=${process.version}`,
+    `Platform=${process.platform}`,
+    `CI=${process.env.CI ? 'true' : 'false'}`,
+    `ExecutionDate=${new Date().toISOString()}`,
+  ].join('\n');
+  fs.writeFileSync('allure-results/environment.properties', envContent);
+} catch {}
 
 const isHeaded = process.argv.some(arg => arg.includes('--headed') || arg.includes('--ui') || arg === '-h') || process.env.HEADED === 'true';
 

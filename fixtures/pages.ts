@@ -53,8 +53,10 @@ type Pages = {
 };
 
 export const test = base.extend<Pages>({
-  page: async ({ page }, use) => {
+  page: async ({ page }, use, testInfo) => {
     await maximizeWindow(page);
+    const runId = process.env.RUN_ID || 'local';
+    testInfo.annotations.push({ type: 'runId', description: runId });
     await use(page);
   },
   homePage: async ({ page }, use) => {

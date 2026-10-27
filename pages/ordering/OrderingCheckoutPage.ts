@@ -42,11 +42,11 @@ export class OrderingCheckoutPage extends BasePage {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         await this.page.goto('/cart', { waitUntil: 'domcontentloaded' });
-        await this.page.waitForTimeout(2000);
+        await this.page.locator('.q-page:visible, main:visible, text=/your cart/i, button:has-text("Checkout")').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
         return;
       } catch (err) {
         if (attempt === 2) throw err;
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForTimeout(1000);
       }
     }
   }
@@ -56,27 +56,30 @@ export class OrderingCheckoutPage extends BasePage {
    */
   async clearCartIfNotEmpty(): Promise<void> {
     await this.gotoCart();
-    await this.page.waitForTimeout(1500);
 
     const emptyNotice = this.page.locator('text=/your cart is empty/i, text=/no items in cart/i').first();
-    if (await emptyNotice.isVisible({ timeout: 1500 }).catch(() => false)) {
+    const clearBtn = this.page.locator('button, a').filter({ hasText: /Empty Cart|Clear Cart|Remove All/i }).first();
+    const deleteButtons = this.page.locator('button:has(.q-icon:has-text("delete")), button i:has-text("delete"), .q-btn [class*="delete"], button:has-text("Remove"), .delete-btn');
+
+    // Auto-wait for either empty indicator or cart items
+    await emptyNotice.or(clearBtn).or(deleteButtons.first()).waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+
+    if (await emptyNotice.isVisible({ timeout: 1000 }).catch(() => false)) {
       return;
     }
 
-    const clearBtn = this.page.locator('button, a').filter({ hasText: /Empty Cart|Clear Cart|Remove All/i }).first();
-    if (await clearBtn.isVisible({ timeout: 2500 }).catch(() => false)) {
+    if (await clearBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await clearBtn.click();
       await this.page.locator('.q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm"), .q-dialog button:has-text("OK")').first().click({ timeout: 2500 }).catch(() => {});
-      await this.page.waitForTimeout(1500);
+      await this.page.locator('.q-dialog').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       return;
     }
 
-    const deleteButtons = this.page.locator('button:has(.q-icon:has-text("delete")), button i:has-text("delete"), .q-btn [class*="delete"], button:has-text("Remove"), .delete-btn');
     let count = await deleteButtons.count();
     for (let i = 0; i < count; i++) {
       await deleteButtons.first().click().catch(() => {});
       await this.page.locator('.q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm"), .q-dialog button:has-text("OK")').first().click({ timeout: 1500 }).catch(() => {});
-      await this.page.waitForTimeout(500);
+      await this.page.locator('.q-dialog').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
   }
 
@@ -380,15 +383,14 @@ export class OrderingCheckoutPage extends BasePage {
     if (this.page.url().includes('/track-order')) return;
 
     // 2. Wait for Thank You page and click "View Order"
-    await this.page.waitForTimeout(2500);
     const viewOrderBtn = this.page.locator('button, a')
       .filter({ hasText: /View Order/i })
       .first();
-    if (await viewOrderBtn.isVisible({ timeout: 20000 }).catch(() => false)) {
+    if (await viewOrderBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false)) {
       await viewOrderBtn.click();
-      await this.page.waitForURL(/track-order/i, { timeout: 20000 }).catch(() => {});
-      await this.page.waitForTimeout(1500);
-      if (this.page.url().includes('/track-order')) return;
+      if (await this.page.waitForURL(/track-order/i, { timeout: 15000 }).then(() => true).catch(() => false)) {
+        return;
+      }
     }
 
     // 3. If URL or page text has order number, go directly to /track-order/:orderId
@@ -396,19 +398,18 @@ export class OrderingCheckoutPage extends BasePage {
       (await this.page.locator('body').innerText().catch(() => '')).match(/(\d{6,}_\d+)/);
     if (orderMatch && orderMatch[1]) {
       await this.page.goto(`/track-order/${orderMatch[1]}`, { waitUntil: 'domcontentloaded' });
-      await this.page.waitForTimeout(2000);
+      await this.page.locator('.q-page:visible, main:visible').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
       return;
     }
 
     // 4. Fallback: go to /orders and open latest order details
     await this.page.goto('/orders', { waitUntil: 'domcontentloaded' });
     await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    await this.page.waitForTimeout(2000);
 
     const trackOrderLink = this.page.locator('a, button').filter({ hasText: /Track Order|View Order|View Details/i }).first();
-    if (await trackOrderLink.isVisible({ timeout: 5000 }).catch(() => false)) {
+    if (await trackOrderLink.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
       await trackOrderLink.click();
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForURL(/track-order/i, { timeout: 10000 }).catch(() => {});
     }
   }
 
@@ -416,7 +417,7 @@ export class OrderingCheckoutPage extends BasePage {
    * Extract Pickup Confirmation Code from customer Order Details, Thank You page, or body
    */
   async getConfirmationCode(): Promise<string> {
-    await this.page.waitForTimeout(1000);
+    // Auto-waits handle synchronization directly
 
     // 1. Direct match on <li><span>Confirmation Code</span><strong>7874</strong></li>
     const strongCode = this.page.locator('li').filter({ hasText: /Confirmation Code/i }).locator('strong').first();
@@ -711,13 +712,13 @@ export class OrderingCheckoutPage extends BasePage {
         const btn = placeButtons.nth(i);
         if (await btn.isVisible().catch(() => false) && await btn.isEnabled().catch(() => false)) {
           await btn.click({ force: true }).catch(() => {});
-          await this.page.waitForTimeout(2000);
           break;
         }
       }
     }
 
-    await this.page.waitForTimeout(2000);
+    // Wait for checkout transition to Thank You or tracking confirmation page
+    await this.page.waitForURL(/thank-you|track-order|order|orders|confirmation/i, { timeout: 25000 }).catch(() => {});
   }
 
   /**
@@ -747,7 +748,6 @@ export class OrderingCheckoutPage extends BasePage {
     const currentUrl = this.page.url();
     await this.page.goto('/orders', { waitUntil: 'domcontentloaded' });
     await this.page.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    await this.page.waitForTimeout(2000);
 
     const orderItem = this.page.locator('li, div').filter({ hasText: /Order Number:/i }).first();
     await orderItem.waitFor({ state: 'visible', timeout: 15000 });

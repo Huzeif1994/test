@@ -15,7 +15,20 @@ on:
       - 'reports/**'
       - 'docs/**'
       - '.gitignore'
-  workflow_dispatch:        # manual run
+  workflow_dispatch:        # manual run with scope selector
+    inputs:
+      test_scope:
+        description: 'Test Execution Scope'
+        required: true
+        default: 'smart'
+        type: choice
+        options:
+          - smart
+          - full
+          - ordering
+          - admin
+          - fulfillment
+          - e2e-bridge
   schedule:
     - cron: '45 6 * * *'   # 12:15 PM IST (06:45 UTC) daily
 
@@ -45,13 +58,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Phase 0: Prerequisite Quality Gate (Fast-Fail: Typecheck + 37 Unit Tests + Smart Selector)
+  # Phase 0: Prerequisite Quality Gate & Smart Test Selection
   quality-gate:
-    name: Quality Gate (Typecheck & Unit Tests)
+    name: Quality Gate & Test Selection
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    outputs:
+      matrix_projects: ${{ steps.selector.outputs.matrix_projects }}
+      run_bridge: ${{ steps.selector.outputs.run_bridge }}
+      run_tests: ${{ steps.selector.outputs.run_tests }}
+      run_id: ${{ steps.selector.outputs.run_id }}
+      selection_reason: ${{ steps.selector.outputs.selection_reason }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -61,21 +82,32 @@ jobs:
       - run: npm ci
 
       # Unit tests run in pure Node.js (tsc + Playwright unit project). No browser binary needed.
-      - name: Enforce Strict Quality Gate (tsc + 37 Unit Tests + Smart Selector Validation)
+      - name: Enforce Strict Quality Gate (tsc + Unit Tests + Manifest Generation)
         run: npm run quality:gate
         env:
           SKIP_CREDENTIAL_CHECK: 'true'
 
-  # Phase 1: Standalone Application Matrix (Runs in parallel across 3 projects)
+      # Calculate targeted execution scope and matrix
+      - name: Smart Test Selection & Target Matrix Calculation
+        id: selector
+        run: npx tsx scripts/smart-test-selector.ts --ci
+        env:
+          TEST_SCOPE: ${{ inputs.test_scope || (github.event_name == 'pull_request' && 'smart' || 'full') }}
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
+  # Phase 1: Standalone Application Matrix (Runs in parallel across selected projects)
   test:
     name: Tests (${{ matrix.project }})
     needs: quality-gate
+    if: ${{ needs.quality-gate.outputs.run_tests == 'true' && needs.quality-gate.outputs.matrix_projects != '[]' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        project: [ordering, admin, fulfillment]
+        project: ${{ fromJSON(needs.quality-gate.outputs.matrix_projects) }}
+    env:
+      RUN_ID: ${{ needs.quality-gate.outputs.run_id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -125,8 +157,11 @@ jobs:
   e2e-bridge:
     name: Tests (e2e-bridge)
     needs: [quality-gate, test]
-    if: ${{ success() }}
+    if: ${{ always() && needs.quality-gate.outputs.run_bridge == 'true' && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      RUN_ID: ${{ needs.quality-gate.outputs.run_id }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -175,8 +210,8 @@ jobs:
   # Phase 3: Allure Aggregation with Historical Trend Retention
   allure-report:
     name: Allure report
-    needs: [test, e2e-bridge]
-    if: ${{ !cancelled() }}
+    needs: [quality-gate, test, e2e-bridge]
+    if: ${{ !cancelled() && needs.quality-gate.outputs.run_tests == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -260,6 +295,7 @@ jobs:
   docker:
     name: Docker Smoke Test (Admin Portal)
     needs: quality-gate
+    if: ${{ github.event_name != 'pull_request' && (contains(needs.quality-gate.outputs.matrix_projects, 'admin') || needs.quality-gate.outputs.matrix_projects == '["ordering","admin","fulfillment"]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -353,6 +389,8 @@ jobs:
           echo "| Metric | Details |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
           echo "| **Overall Status** | ${{ steps.outcome.outputs.status_badge }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Run ID** | \`${{ needs.quality-gate.outputs.run_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Selection Mode** | \`${{ needs.quality-gate.outputs.selection_reason }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Environment** | \`${{ env.TEST_ENV }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Branch / Ref** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
@@ -361,7 +399,7 @@ jobs:
           echo "### 📋 Per-Job Execution Breakdown:" >> $GITHUB_STEP_SUMMARY
           echo "| Pipeline Phase | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🛡️ **Quality Gate (Typecheck + 37 Unit Tests)** | \`${{ needs.quality-gate.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🛡️ **Quality Gate (Typecheck + 44 Unit Tests + Manifest)** | \`${{ needs.quality-gate.result }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🧪 **Matrix Tests (Ordering, Admin, Fulfillment)** | \`${{ needs.test.result }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌉 **Cross-App E2E Bridge** | \`${{ needs.e2e-bridge.result }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🐳 **Docker Smoke Verification** | \`${{ needs.docker.result }}\` |" >> $GITHUB_STEP_SUMMARY

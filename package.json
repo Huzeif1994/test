@@ -14,6 +14,7 @@
     "test:ui": "playwright test --ui",
     "test:changed": "tsx scripts/smart-test-selector.ts --run",
     "test:changed:list": "tsx scripts/smart-test-selector.ts",
+    "test:manifest": "tsx scripts/generate-manifest.ts",
     "test:plan": "tsx scripts/ai-planner.ts",
     "test:generate": "tsx scripts/ai-generate.ts",
     "test:heal": "tsx scripts/ai-heal.ts",

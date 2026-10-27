@@ -1,0 +1,564 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-10-27T06:07:27.217Z",
+  "summary": {
+    "totalTests": 31,
+    "suites": {
+      "regression": 20,
+      "release-critical": 5,
+      "e2e": 4,
+      "smoke": 2
+    },
+    "projects": {
+      "admin": 5,
+      "e2e-bridge": 4,
+      "fulfillment": 9,
+      "generated": 4,
+      "ordering": 5,
+      "setup": 4
+    },
+    "priorities": {
+      "normal": 22,
+      "critical": 2,
+      "blocker": 7
+    }
+  },
+  "tests": [
+    {
+      "id": "ADM-001",
+      "title": "Scenario 1: Configure Only \"Enable Age Verification\" main toggle",
+      "file": "tests/admin/admin-age-verification-settings.spec.ts",
+      "project": "admin",
+      "module": "admin",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@admin",
+        "@age-settings"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-admin"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "ADM-002",
+      "title": "Scenario 2: Configure Age Verification before showing age-restricted products",
+      "file": "tests/admin/admin-age-verification-settings.spec.ts",
+      "project": "admin",
+      "module": "admin",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@admin",
+        "@age-settings"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-admin"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "ADM-003",
+      "title": "Scenario 3: Configure Age Verification during checkout",
+      "file": "tests/admin/admin-age-verification-settings.spec.ts",
+      "project": "admin",
+      "module": "admin",
+      "suite": "release-critical",
+      "priority": "critical",
+      "tags": [
+        "@admin",
+        "@age-settings"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-admin"
+      ],
+      "estimatedDurationMs": 45000
+    },
+    {
+      "id": "ADM-004",
+      "title": "Scenario 4 & 5: Configure Age Verification during fulfillment with manual DOB fallback",
+      "file": "tests/admin/admin-age-verification-settings.spec.ts",
+      "project": "admin",
+      "module": "admin",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@admin",
+        "@age-settings"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-admin"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "ADM-005",
+      "title": "admin user logs in via Identity Server and redirects to dashboard",
+      "file": "tests/admin/admin.spec.ts",
+      "project": "admin",
+      "module": "admin",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [],
+      "dependencies": [
+        "setup-preflight",
+        "setup-admin"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "BRG-001",
+      "title": "Complete Customer Order placement bridged to Fulfillment Picking and Staging",
+      "file": "tests/e2e-bridge/cross-app-ordering-to-fulfillment.spec.ts",
+      "project": "e2e-bridge",
+      "module": "storefront",
+      "suite": "e2e",
+      "priority": "blocker",
+      "tags": [
+        "@bridge",
+        "@e2e"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 90000
+    },
+    {
+      "id": "BRG-002",
+      "title": "Customer places In-Store Pickup order with Credit Card -> Fulfillment picks, marks Ready, enters Confirmation Code -> Order fulfilled",
+      "file": "tests/e2e-bridge/flow1-store-pickup-card.spec.ts",
+      "project": "e2e-bridge",
+      "module": "general",
+      "suite": "e2e",
+      "priority": "blocker",
+      "tags": [
+        "@bridge",
+        "@flow1"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 90000
+    },
+    {
+      "id": "BRG-003",
+      "title": "Customer places Curbside order -> Mobile View vehicle arrival -> Fulfillment verifies Spot & Car Info -> Handover to Fulfilled",
+      "file": "tests/e2e-bridge/flow2-curbside-mobile-arrival.spec.ts",
+      "project": "e2e-bridge",
+      "module": "general",
+      "suite": "e2e",
+      "priority": "blocker",
+      "tags": [
+        "@bridge",
+        "@flow2"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 90000
+    },
+    {
+      "id": "BRG-004",
+      "title": "Complete Customer Purchase -> Pre-Fulfillment Verification -> Fulfillment 12-digit Barcode Assignment -> Live Activated Validation",
+      "file": "tests/e2e-bridge/physical-gift-card-lifecycle.spec.ts",
+      "project": "e2e-bridge",
+      "module": "giftcard",
+      "suite": "e2e",
+      "priority": "blocker",
+      "tags": [
+        "@bridge",
+        "@physical-giftcard"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 90000
+    },
+    {
+      "id": "FUL-001",
+      "title": "verify age verification options and manual DOB fallback during handover",
+      "file": "tests/fulfillment/fulfillment-age-verification.spec.ts",
+      "project": "fulfillment",
+      "module": "fulfillment",
+      "suite": "release-critical",
+      "priority": "blocker",
+      "tags": [
+        "@fulfillment",
+        "@age-verification"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 45000
+    },
+    {
+      "id": "FUL-002",
+      "title": "Pending Orders controls, search, pagination, 5-action menu, and order details actions",
+      "file": "tests/fulfillment/fulfillment-pending-orders.spec.ts",
+      "project": "fulfillment",
+      "module": "orders",
+      "suite": "smoke",
+      "priority": "normal",
+      "tags": [
+        "@smoke",
+        "@pending"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 10000
+    },
+    {
+      "id": "FUL-003",
+      "title": "Complete End-to-End Picking flow: Item Picking -> Delivery Handling -> Staging Area -> Mark Ready",
+      "file": "tests/fulfillment/fulfillment-pending-orders.spec.ts",
+      "project": "fulfillment",
+      "module": "picking",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@e2e",
+        "@picking"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "FUL-004",
+      "title": "Navigate to In Progress Orders and verify table controls",
+      "file": "tests/fulfillment/fulfillment-sidebar-modules.spec.ts",
+      "project": "fulfillment",
+      "module": "fulfillment",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@fulfillment",
+        "@inprogress"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "FUL-005",
+      "title": "Navigate to Fulfilled Orders and verify table controls",
+      "file": "tests/fulfillment/fulfillment-sidebar-modules.spec.ts",
+      "project": "fulfillment",
+      "module": "fulfillment",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@fulfillment",
+        "@fulfilled"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "FUL-006",
+      "title": "Navigate to All Orders and verify table controls",
+      "file": "tests/fulfillment/fulfillment-sidebar-modules.spec.ts",
+      "project": "fulfillment",
+      "module": "fulfillment",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@fulfillment",
+        "@all-orders"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "FUL-007",
+      "title": "Navigate to Manage Staging Area and verify staging locations",
+      "file": "tests/fulfillment/fulfillment-sidebar-modules.spec.ts",
+      "project": "fulfillment",
+      "module": "staging",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@fulfillment",
+        "@staging"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "FUL-008",
+      "title": "user logs in, navigates through sidebar modules, and interacts with orders table",
+      "file": "tests/fulfillment/fulfillment-smoke.spec.ts",
+      "project": "fulfillment",
+      "module": "fulfillment",
+      "suite": "smoke",
+      "priority": "normal",
+      "tags": [
+        "@smoke"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 10000
+    },
+    {
+      "id": "FUL-009",
+      "title": "fulfillment user logs in via Identity Server and redirects to dashboard",
+      "file": "tests/fulfillment/fulfillment.spec.ts",
+      "project": "fulfillment",
+      "module": "fulfillment",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [],
+      "dependencies": [
+        "setup-preflight",
+        "setup-fulfillment"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "GEN-001",
+      "title": "Complete In-Store Pickup Lifecycle with Confirmation Code Handover",
+      "file": "tests/generated/us-001-customer-store-pickup-with-credit-card-and-fulfillment-handover.spec.ts",
+      "project": "generated",
+      "module": "handover",
+      "suite": "release-critical",
+      "priority": "blocker",
+      "tags": [
+        "@generated",
+        "@us-001"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 45000
+    },
+    {
+      "id": "GEN-002",
+      "title": "Complete Curbside Mobile Arrival and Vehicle Verification",
+      "file": "tests/generated/us-002-curbside-pickup-with-mobile-emulation-and-live-vehicle-arrival.spec.ts",
+      "project": "generated",
+      "module": "general",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@generated",
+        "@us-002"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "GEN-003",
+      "title": "Physical Gift Card Purchase to POS Barcode Activation",
+      "file": "tests/generated/us-003-physical-gift-card-end-to-end-purchase-barcode-assignment-and-pos-sync.spec.ts",
+      "project": "generated",
+      "module": "giftcard",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@generated",
+        "@us-003"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "GEN-004",
+      "title": "Verify Partial Loyalty Points Redemption During Checkout and After Order Placement",
+      "file": "tests/generated/us-004-customer-loyalty-points-redemption-at-checkout.spec.ts",
+      "project": "generated",
+      "module": "checkout",
+      "suite": "release-critical",
+      "priority": "critical",
+      "tags": [
+        "@generated",
+        "@us-004"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 45000
+    },
+    {
+      "id": "ORD-001",
+      "title": "Customer purchases Digital Gift Card via Buy Now, activates in Newly Purchased tab, and validates Active status",
+      "file": "tests/ordering/ordering-digital-gift-card.spec.ts",
+      "project": "ordering",
+      "module": "giftcard",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@ordering",
+        "@giftcard"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "ORD-002",
+      "title": "Customer browses catalog and verifies category items",
+      "file": "tests/ordering/ordering-storefront-flow.spec.ts",
+      "project": "ordering",
+      "module": "catalog",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@ordering",
+        "@catalog"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "ORD-003",
+      "title": "Customer adds item to cart and proceeds to cart review",
+      "file": "tests/ordering/ordering-storefront-flow.spec.ts",
+      "project": "ordering",
+      "module": "cart",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [
+        "@ordering",
+        "@cart"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "ORD-004",
+      "title": "Customer completes checkout with Pay At Store and places order",
+      "file": "tests/ordering/ordering-storefront-flow.spec.ts",
+      "project": "ordering",
+      "module": "checkout",
+      "suite": "release-critical",
+      "priority": "blocker",
+      "tags": [
+        "@ordering",
+        "@checkout"
+      ],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 45000
+    },
+    {
+      "id": "ORD-005",
+      "title": "user visits storefront, handles popups, and logs in via Identity Server",
+      "file": "tests/ordering/ordering.spec.ts",
+      "project": "ordering",
+      "module": "storefront",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [],
+      "dependencies": [
+        "setup-preflight",
+        "setup-ordering"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "STP-001",
+      "title": "authenticate admin user and save storage state",
+      "file": "tests/setup/auth.admin.setup.ts",
+      "project": "setup",
+      "module": "auth",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [],
+      "dependencies": [
+        "setup-preflight"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "STP-002",
+      "title": "authenticate fulfillment user and save storage state",
+      "file": "tests/setup/auth.fulfillment.setup.ts",
+      "project": "setup",
+      "module": "auth",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [],
+      "dependencies": [
+        "setup-preflight"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "STP-003",
+      "title": "authenticate ordering customer and save storage state",
+      "file": "tests/setup/auth.ordering.setup.ts",
+      "project": "setup",
+      "module": "auth",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [],
+      "dependencies": [
+        "setup-preflight"
+      ],
+      "estimatedDurationMs": 15000
+    },
+    {
+      "id": "STP-004",
+      "title": "verify environment health & accessibility across portals",
+      "file": "tests/setup/preflight.setup.ts",
+      "project": "setup",
+      "module": "general",
+      "suite": "regression",
+      "priority": "normal",
+      "tags": [],
+      "dependencies": [
+        "setup-preflight"
+      ],
+      "estimatedDurationMs": 15000
+    }
+  ]
+}
