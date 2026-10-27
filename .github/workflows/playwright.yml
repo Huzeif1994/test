@@ -99,13 +99,13 @@ jobs:
   test:
     name: Tests (${{ matrix.project }})
     needs: quality-gate
-    if: ${{ needs.quality-gate.outputs.run_tests == 'true' && needs.quality-gate.outputs.matrix_projects != '[]' }}
+    if: ${{ needs.quality-gate.result == 'success' && needs.quality-gate.outputs.run_tests == 'true' && needs.quality-gate.outputs.matrix_projects != '[]' && needs.quality-gate.outputs.matrix_projects != '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        project: ${{ fromJSON(needs.quality-gate.outputs.matrix_projects) }}
+        project: ${{ fromJson(needs.quality-gate.outputs.matrix_projects || '["ordering"]') }}
     env:
       RUN_ID: ${{ needs.quality-gate.outputs.run_id }}
     steps:
@@ -162,7 +162,6 @@ jobs:
     timeout-minutes: 30
     env:
       RUN_ID: ${{ needs.quality-gate.outputs.run_id }}
-    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 

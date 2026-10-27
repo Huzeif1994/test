@@ -53,3 +53,4 @@ test.describe('Test Manifest & QA Catalog — Unit Test Suite', () => {
     expect(firstTest.estimatedDurationMs).toBeGreaterThan(0);
   });
 });
+
