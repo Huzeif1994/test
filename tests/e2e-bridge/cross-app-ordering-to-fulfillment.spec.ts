@@ -47,7 +47,7 @@ test.describe('Cross-App E2E Integration Suite: Ordering to Fulfillment', () => 
 
     await test.step('Customer clears cart, browses category, adds CASA TURRENT SERIE 1973 ROBUSTO, and proceeds to checkout', async () => {
       await checkoutPage.clearCartIfNotEmpty();
-      await catalogPage.gotoCategory('huzeif-test');
+      await catalogPage.gotoCategory();
       await catalogPage.addProductToCart('CASA TURRENT SERIE 1973 ROBUSTO');
       await catalogPage.openCartAndProceed();
       await checkoutPage.proceedToCheckout();

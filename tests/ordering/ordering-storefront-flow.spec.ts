@@ -11,8 +11,8 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
     await allure.feature('Catalog Browsing');
     await allure.severity('critical');
 
-    await test.step('Navigate to Huzeif Test category page', async () => {
-      await orderingCatalogPage.gotoCategory('huzeif-test');
+    await test.step('Navigate to category page', async () => {
+      await orderingCatalogPage.gotoCategory();
     });
 
     await test.step('Verify category items rendered and skeletons detached', async () => {
@@ -32,7 +32,7 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
     await allure.severity('critical');
 
     await test.step('Navigate to category and add product to cart', async () => {
-      await orderingCatalogPage.gotoCategory('huzeif-test');
+      await orderingCatalogPage.gotoCategory();
       await orderingCatalogPage.addProductToCart();
     });
 
@@ -53,7 +53,7 @@ test.describe('Online Ordering Storefront & Checkout Flow', () => {
     await allure.severity('blocker');
 
     await test.step('Ensure item in cart and proceed to Checkout page', async () => {
-      await orderingCatalogPage.gotoCategory('huzeif-test');
+      await orderingCatalogPage.gotoCategory();
       await orderingCatalogPage.addProductToCart();
       await orderingCatalogPage.openCartAndProceed();
       await orderingCheckoutPage.proceedToCheckout();

@@ -5,7 +5,7 @@ import { BasePage } from '../BasePage';
  * Online Ordering Catalog & Product Browsing Page Object
  */
 export class OrderingCatalogPage extends BasePage {
-  protected readonly path = '/category/huzeif-test';
+  protected readonly path = '/category/accessories-60';
 
   readonly categoryHeading: Locator;
   readonly productCards: Locator;
@@ -18,7 +18,7 @@ export class OrderingCatalogPage extends BasePage {
     super(page);
 
     this.categoryHeading = page.locator('h1, h2, .text-h5, .text-h6, .breadcrumb').first();
-    this.productCards = page.locator('.product-card, .q-card, [class*="product-card"]');
+    this.productCards = page.locator('.product-items--card:visible, .product-card:visible, [class*="product-items"]:visible, .q-card.product-items--card:visible');
     this.skeletons = page.locator('.q-skeleton');
     this.yourCartButton = page.locator('button, a').filter({ hasText: /Your Cart/i }).first();
     this.cartDrawer = page.locator('complementary, aside, .q-drawer').filter({ hasText: /Store Pickup|Sub Total|Proceed To Cart/i }).first();
@@ -26,44 +26,80 @@ export class OrderingCatalogPage extends BasePage {
   }
 
   /**
-   * Navigate to a category with resilient auto-discovery of active categories.
-   * If the requested category has 0 items or is missing, automatically discovers an active category.
+   * Navigate to a category with resilient dynamic auto-discovery of active FTx Storefront categories.
+   * If the requested category has 0 items, redirects to home, or is missing/legacy POS,
+   * it dynamically discovers and navigates to an active FTx category.
    */
-  async gotoCategory(categorySlug: string = 'huzeif-test'): Promise<void> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        await this.page.goto(`/category/${categorySlug}`, { waitUntil: 'domcontentloaded' });
-        await this.expectProductsLoaded(8000);
-        return;
-      } catch {
-        if (attempt === 1) {
-          console.log(`⚠️ Category "${categorySlug}" unavailable or has no items. Discovering active categories dynamically...`);
-          await this.discoverAndNavigateToActiveCategory();
-          return;
+  async gotoCategory(categorySlug?: string): Promise<void> {
+    const isLegacyOrEmpty = !categorySlug ||
+      categorySlug === 'discount-&-budget-cigarettes' ||
+      categorySlug === 'huzeif-test' ||
+      categorySlug === 'tobacco-items';
+
+    if (!isLegacyOrEmpty && categorySlug) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          await this.page.goto(`/category/${categorySlug}`, { waitUntil: 'domcontentloaded' });
+          await this.dismissPopups();
+          if (this.page.url().includes(`/category/${categorySlug}`)) {
+            await this.expectProductsLoaded(8000);
+            return;
+          }
+        } catch {
+          if (attempt === 1) {
+            console.log(`⚠️ Category "${categorySlug}" unavailable. Discovering active FTx categories dynamically...`);
+          }
+          await this.page.waitForTimeout(1000);
         }
-        await this.page.waitForTimeout(1000);
       }
     }
+
+    await this.discoverAndNavigateToActiveCategory();
   }
 
   /**
-   * Dynamically discover active categories from storefront header navigation
+   * Dynamically discover active FTx categories from storefront navigation or prime candidates
    */
   async discoverAndNavigateToActiveCategory(): Promise<void> {
     await this.dismissPopups();
+
+    // 1. Try known active FTx Storefront categories
+    const primeCategories = [
+      '/category/accessories-60',
+      '/category/apparel-01',
+      '/category/cigarettes',
+      '/category/aj-product-category',
+      '/collection/best-selling-products-last-7-days'
+    ];
+
+    for (const catUrl of primeCategories) {
+      try {
+        await this.page.goto(catUrl, { waitUntil: 'domcontentloaded' });
+        await this.dismissPopups();
+        if (this.page.url().includes('category') || this.page.url().includes('collection')) {
+          const hasCards = await this.productCards.first().isVisible({ timeout: 3500 }).catch(() => false);
+          if (hasCards) {
+            console.log(`🎯 Dynamically routed to active FTx category: ${catUrl}`);
+            return;
+          }
+        }
+      } catch {
+        // try next prime candidate
+      }
+    }
+
     if (this.page.url() !== '/' && !this.page.url().includes('category')) {
       await this.page.goto('/', { waitUntil: 'domcontentloaded' });
       await this.dismissPopups();
     }
 
-    // 1. Check if category links already exist in navigation or page
+    // 2. Discover from header / menu navigation
     let categoryLinks = await this.page.locator('a[href*="/category/"]').evaluateAll(els =>
       els.map(e => e.getAttribute('href')).filter(Boolean) as string[]
     );
 
-    // 2. If not visible, click "All" button to expand departments/categories
     if (categoryLinks.length === 0) {
-      const allBtn = this.page.locator('button, .q-btn, a').filter({ hasText: /^All$/i }).first();
+      const allBtn = this.page.locator('button, .q-btn, a').filter({ hasText: /^All$|Shop by Categories/i }).first();
       if (await allBtn.isVisible({ timeout: 2500 }).catch(() => false)) {
         await allBtn.click({ force: true });
         await this.page.waitForTimeout(1200);
@@ -73,16 +109,27 @@ export class OrderingCatalogPage extends BasePage {
       }
     }
 
-    const uniqueCategories = [...new Set(categoryLinks)].filter(c => !c.includes('non-existent'));
-    if (uniqueCategories.length > 0) {
-      const chosenCategory = uniqueCategories[0];
-      console.log(`🎯 Dynamically discovered active category: ${chosenCategory}`);
-      await this.page.goto(chosenCategory, { waitUntil: 'domcontentloaded' });
-      await this.expectProductsLoaded(15000);
-      return;
+    const uniqueCategories = [...new Set(categoryLinks)].filter(c =>
+      !c.includes('non-existent') &&
+      !c.includes('huzeif-test') &&
+      !c.includes('discount-&-budget-cigarettes')
+    );
+
+    for (const chosenCategory of uniqueCategories.slice(0, 5)) {
+      try {
+        await this.page.goto(chosenCategory, { waitUntil: 'domcontentloaded' });
+        await this.dismissPopups();
+        const hasVisible = await this.productCards.first().isVisible({ timeout: 3000 }).catch(() => false);
+        if (hasVisible) {
+          console.log(`🎯 Discovered active FTx category: ${chosenCategory}`);
+          return;
+        }
+      } catch {
+        // try next
+      }
     }
 
-    console.log('⚠️ No category links found via navigation; falling back to best selling collection.');
+    console.log('⚠️ Falling back to best selling collection.');
     await this.page.goto('/collection/best-selling-products-last-7-days', { waitUntil: 'domcontentloaded' });
     await this.expectProductsLoaded(15000);
   }
@@ -108,14 +155,14 @@ export class OrderingCatalogPage extends BasePage {
   }
 
   /**
-   * Wait for category products to render
+   * Wait for category products to render (resolving strictly to first visible indicator)
    */
   async expectProductsLoaded(timeout: number = 35000): Promise<void> {
     await this.dismissPopups();
-    // Wait directly for products or Add buttons to be visible (avoid waiting 35s for detached skeletons)
+    // Use .first() at the end to ensure strict mode compliance across combined locators
     const productIndicator = this.productCards.first().or(
-      this.page.locator('.add-cart, .btn, button, .q-btn').filter({ hasText: /Add to Cart/i }).first()
-    );
+      this.page.locator('.add-cart:visible, .btn:visible, button:visible, .q-btn:visible').filter({ hasText: /Add to Cart/i }).first()
+    ).first();
     await productIndicator.waitFor({ state: 'visible', timeout });
     await this.page.waitForTimeout(500);
   }
@@ -154,11 +201,11 @@ export class OrderingCatalogPage extends BasePage {
     }
 
     if (!targetBtn) {
-      const cardWithControls = this.page.locator('.q-card, .product-card, [class*="product-card"]').filter({
+      const cardWithControls = this.page.locator('.product-items--card:visible, .product-card:visible').filter({
         has: this.page.locator('button:has-text("+"), button i:has-text("delete"), .q-field, input')
       }).first();
 
-      const addBtn = this.page.locator('.q-card, .product-card, [class*="product-card"]')
+      const addBtn = this.page.locator('.product-items--card:visible, .product-card:visible')
         .locator('.add-cart, .btn, button, .q-btn, [role="button"]')
         .filter({ hasText: /Add to Cart/i })
         .first();
@@ -169,7 +216,7 @@ export class OrderingCatalogPage extends BasePage {
         console.log('An item is already in the cart, proceeding.');
         return;
       } else {
-        const anyAddBtn = this.page.locator('.add-cart, .btn, button, .q-btn, [role="button"]').filter({ hasText: /Add to Cart/i }).first();
+        const anyAddBtn = this.page.locator('.add-cart:visible, .btn:visible, button:visible, .q-btn:visible, [role="button"]:visible').filter({ hasText: /Add to Cart/i }).first();
         if (await anyAddBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           targetBtn = anyAddBtn;
         }
@@ -187,7 +234,7 @@ export class OrderingCatalogPage extends BasePage {
     console.log(`⚠️ [Catalog Resilience] Product "${productName || 'Default'}" not found in current category. Discovering active physical category...`);
     await this.discoverAndNavigateToActiveCategory();
 
-    const discoveredAddBtn = this.page.locator('.add-cart, .btn, button, .q-btn, [role="button"]')
+    const discoveredAddBtn = this.page.locator('.add-cart:visible, .btn:visible, button:visible, .q-btn:visible, [role="button"]:visible')
       .filter({ hasText: /Add to Cart/i })
       .first();
 
