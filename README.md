@@ -21,7 +21,7 @@ The test suite publishes an interactive Allure report to GitHub Pages on every b
 
 - **Multi-Portal Orchestration**: Unified test framework covering Online Ordering storefront, Merchant Admin Portal, Operations Fulfillment, and cross-application integration flows.
 - **Cross-App E2E Bridge**: Serialized end-to-end user journeys validating real-time order creation, warehouse item picking, staging bay assignment, and curbside mobile arrival with zero test data collisions.
-- **Multi-Stage CI/CD Pipeline**: 3 parallel matrix jobs, dedicated serialized E2E bridge execution, unified Allure aggregation with trend history cache, Docker smoke verification, and automated status notifications.
+- **Multi-Stage CI/CD Pipeline**: 4 parallel matrix jobs, dedicated serialized E2E bridge execution, unified Allure aggregation with trend history cache, Docker smoke verification, and automated status notifications.
 - **Predictive Smart Test Selector**: Reads Git diffs against target branches to run only affected test suites, cutting pull request CI execution time by 65%.
 - **Dynamic Locator Resilience & Self-Healing**: Resilient multi-attribute locators with fallback ranking, preventing test breakage from UI updates and hot-patching drifting selectors.
 - **Enterprise Security**: Zero committed credentials or fallback passwords; strict fail-fast validation across both local and CI environments via `.env` and GitHub Secrets.
@@ -54,7 +54,7 @@ npx playwright install chromium
 # 3. Create .env from template and configure credentials
 cp .env.example .env
 
-# 4. Run quality gate (TypeScript type-safety + 37 Unit tests + Selector validation)
+# 4. Run quality gate (TypeScript type-safety + 47 unit tests + selector validation)
 npm run quality:gate
 
 # 5. Execute all test suites (Default: Dev environment)
@@ -72,7 +72,7 @@ npm test
 | **`fulfillment`** | • Pending Orders menu, search, pagination<br>• End-to-end Picking workflow: Item Picking -> Delivery Handling -> Staging -> Mark Ready<br>• In Progress Orders table & status validation<br>• Fulfilled Orders table & order history<br>• All Orders table & search filters<br>• Manage Staging Area location inventory | `tests/fulfillment/fulfillment-pending-orders.spec.ts`<br>`tests/fulfillment/fulfillment-sidebar-modules.spec.ts` |
 | **`e2e-bridge`** | • Customer places real order on Online Ordering storefront<br>• Cross-boundary order ID propagation to Fulfillment<br>• Fulfillment employee searches order & opens details modal<br>• Item picking, staging container assignment, and Ready status dispatch<br>• Curbside arrival notice, vehicle details, and mobile parking spot check-in<br>• Physical Gift Card full lifecycle: Admin creation → Storefront purchase → Fulfillment activation | `tests/e2e-bridge/cross-app-ordering-to-fulfillment.spec.ts`<br>`tests/e2e-bridge/flow1-store-pickup-card.spec.ts`<br>`tests/e2e-bridge/flow2-curbside-mobile-arrival.spec.ts`<br>`tests/e2e-bridge/physical-gift-card-lifecycle.spec.ts` |
 | **`generated`** | • Agile User Story specs synthesized directly from Gherkin requirements<br>• Loyalty points partial redemption during checkout and post-order verification | `tests/generated/us-004-customer-loyalty-points-redemption-at-checkout.spec.ts` |
-| **`unit`** | • Smart Test Selector rule mapping & untrusted shallow-clone fallback (11 tests)<br>• Fail-fast environment secret validation & bypass mechanisms (4 tests)<br>• Current-session defect reporter parsing & suggested severity (5 tests)<br>• OpenAPI $ref resolution, schema validation & typed client generation (4 tests)<br>• Agile Story Planner metadata & Gherkin parsing (4 tests)<br>• POM-aware test generator & typed action synthesis (5 tests)<br>• Locator self-healer parsing & safe file patching (4 tests) | `tests/unit/*.spec.ts`<br>*(37 unit tests total)* |
+| **`unit`** | • Smart Test Selector mapping & untrusted-clone fallback (14 tests)<br>• Environment secret validation (4 tests)<br>• Defect reporter classification & payload generation (7 tests)<br>• OpenAPI fixture generation (4 tests)<br>• Agile Story Planner (4 tests)<br>• POM-aware test generation (3 tests)<br>• Locator self-healer (5 tests)<br>• Test manifest generation (6 tests) | `tests/unit/*.spec.ts`<br>*(47 unit tests total)* |
 
 ---
 
@@ -146,19 +146,20 @@ npm run api:generate-fixtures
 To enforce code health and maintainability across team members and automated PR checks:
 
 ```bash
-# Runs full TypeScript typecheck + 37 Unit tests + Predictive selector validation
+# Runs full TypeScript typecheck + 47 unit tests + predictive selector validation
 npm run quality:gate
 
 # Typecheck only (Strict mode, noEmit)
 npm run typecheck
 
-# Run 37 unit tests only
+# Run 47 unit tests only
 npm run test:unit
 ```
 
 - **Type Safety**: Strictly typed Page Object models, custom fixtures, and environment configuration (`0 errors` on `tsc --noEmit`).
-- **Deterministic Waits**: Zero arbitrary `waitForTimeout` calls in production flows; all asynchronous UI states are guarded by explicit locator conditions (`waitFor({ state: 'visible' })`) and polling helpers (`waitForOrderInPending`).
+- **Condition-Based Waits**: Most UI synchronization uses locator conditions and polling helpers; a few fixed waits remain in generated and legacy flows and should be replaced as those tests are hardened.
 - **Test Isolation**: Each test run generates unique order numbers and handles cart cleanup. Cross-app E2E tests run sequentially in a dedicated CI job to prevent cart collisions.
+- **Fulfillment E2E recovery**: The seeded fulfillment workflow uses the Dev test customer's saved card, then completes the pickup order to Fulfilled (the record remains in order history). If a run stops after order creation, set `FULFILLMENT_TEST_ORDER_NUMBER` to the logged order number to resume that order instead of creating another.
 
 ---
 
@@ -168,10 +169,10 @@ The repository runs a multi-stage workflow on every push to `main`, pull request
 
 ```mermaid
 flowchart TD
-    A[Push / PR / Schedule / Manual] --> QG[Phase 0: Quality Gate<br/>Typecheck + 37 Unit Tests + Smart Selector]
+    A[Push / PR / Schedule / Manual] --> QG[Phase 0: Quality Gate<br/>Typecheck + 47 Unit Tests + Smart Selector]
     
     QG --> B[Phase 1: Application Matrix]
-    subgraph Phase1 [Phase 1: 3 Parallel Matrix Jobs]
+    subgraph Phase1 [Phase 1: 4 Parallel Matrix Jobs]
         B1[Ordering Tests]
         B2[Admin Tests]
         B3[Fulfillment Tests]
@@ -265,7 +266,7 @@ npm run docker:allure
 | `npm run test:fulfillment` | Run Fulfillment App operations tests |
 | `npm run test:e2e-bridge` | Run Cross-Application E2E integration bridge |
 | `npm run test:generated` | Run Agile synthesized user story test specs |
-| `npm run test:unit` | Run 37 unit tests (Selector, Security, Healer, Planner & OpenAPI generator) |
+| `npm run test:unit` | Run 47 unit tests (Selector, Security, Defect Reporter, Healer, Planner, Manifest & OpenAPI generator) |
 | `npm run test:changed` | Run only tests affected by recent git changes (Predictive Selector) |
 | `npm run test:changed:list` | Preview affected tests without execution |
 | `npm run test:plan` | Parse user stories into structured JSON test plans |
@@ -273,7 +274,7 @@ npm run docker:allure
 | `npm run test:heal` | Autonomous locator self-healing and POM hot-patching |
 | `npm run report:bug` | Generate automated Markdown or Jira bug report from verified test failures |
 | `npm run api:generate-fixtures` | Synthesize typed API client, payload and response interfaces from OpenAPI |
-| `npm run quality:gate` | Strict quality gate (Typecheck + 37 Unit tests + Selector validation) |
+| `npm run quality:gate` | Strict quality gate (Typecheck + 47 unit tests + Selector validation) |
 | `npm run typecheck` | Run TypeScript validation (`tsc --noEmit`) |
 | `npm run test:headed` | Run tests with browser UI visible |
 | `npm run test:ui` | Open Playwright interactive UI mode |

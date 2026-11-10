@@ -28,6 +28,7 @@ on:
           - ordering
           - admin
           - fulfillment
+          - generated
           - e2e-bridge
   schedule:
     - cron: '45 6 * * *'   # 12:15 PM IST (06:45 UTC) daily
@@ -95,7 +96,7 @@ jobs:
           TEST_SCOPE: ${{ inputs.test_scope || (github.event_name == 'pull_request' && 'smart' || 'full') }}
           RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
 
-  # Phase 1: Standalone Application Matrix (Runs in parallel across selected projects)
+  # Phase 1: Application Matrix (Runs in parallel across selected projects)
   test:
     name: Tests (${{ matrix.project }})
     needs: quality-gate
@@ -369,16 +370,46 @@ jobs:
           QG_STATUS="${{ needs.quality-gate.result }}"
           TEST_STATUS="${{ needs.test.result }}"
           BRIDGE_STATUS="${{ needs.e2e-bridge.result }}"
+          ALLURE_STATUS="${{ needs.allure-report.result }}"
+          DEPLOY_STATUS="${{ needs.deploy-report.result }}"
           DOCKER_STATUS="${{ needs.docker.result }}"
+          MATRIX_PROJECTS='${{ needs.quality-gate.outputs.matrix_projects }}'
+          RUN_TESTS="${{ needs.quality-gate.outputs.run_tests }}"
+          RUN_BRIDGE="${{ needs.quality-gate.outputs.run_bridge }}"
+          EVENT_NAME="${{ github.event_name }}"
+          FAILED=false
 
-          if [ "$QG_STATUS" = "success" ] && [ "$TEST_STATUS" = "success" ] && [ "$BRIDGE_STATUS" = "success" ] && [ "$DOCKER_STATUS" = "success" ]; then
-            echo "status_title=PASSED" >> $GITHUB_OUTPUT
-            echo "status_color=#28a745" >> $GITHUB_OUTPUT
-            echo "status_badge=✅ SUCCESS" >> $GITHUB_OUTPUT
+          if [ "$QG_STATUS" != "success" ]; then
+            FAILED=true
+          fi
+
+          if [ "$RUN_TESTS" = "true" ]; then
+            if [ "$MATRIX_PROJECTS" != "[]" ] && [ "$TEST_STATUS" != "success" ]; then
+              FAILED=true
+            fi
+            if [ "$RUN_BRIDGE" = "true" ] && [ "$BRIDGE_STATUS" != "success" ]; then
+              FAILED=true
+            fi
+            if [ "$ALLURE_STATUS" != "success" ]; then
+              FAILED=true
+            fi
+            if [ "$EVENT_NAME" != "pull_request" ] && [ "$DEPLOY_STATUS" != "success" ]; then
+              FAILED=true
+            fi
+          fi
+
+          if [ "$EVENT_NAME" != "pull_request" ] && [[ "$MATRIX_PROJECTS" == *'"admin"'* ]] && [ "$DOCKER_STATUS" != "success" ]; then
+            FAILED=true
+          fi
+
+          if [ "$FAILED" = "false" ]; then
+            echo "status_title=PASSED" >> "$GITHUB_OUTPUT"
+            echo "status_color=#28a745" >> "$GITHUB_OUTPUT"
+            echo "status_badge=✅ SUCCESS" >> "$GITHUB_OUTPUT"
           else
-            echo "status_title=FAILED" >> $GITHUB_OUTPUT
-            echo "status_color=#dc3545" >> $GITHUB_OUTPUT
-            echo "status_badge=❌ FAILURE" >> $GITHUB_OUTPUT
+            echo "status_title=FAILED" >> "$GITHUB_OUTPUT"
+            echo "status_color=#dc3545" >> "$GITHUB_OUTPUT"
+            echo "status_badge=❌ FAILURE" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish GitHub Actions Job Summary with Per-Job Diagnostics
@@ -398,8 +429,8 @@ jobs:
           echo "### 📋 Per-Job Execution Breakdown:" >> $GITHUB_STEP_SUMMARY
           echo "| Pipeline Phase | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🛡️ **Quality Gate (Typecheck + 44 Unit Tests + Manifest)** | \`${{ needs.quality-gate.result }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🧪 **Matrix Tests (Ordering, Admin, Fulfillment)** | \`${{ needs.test.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🛡️ **Quality Gate (Typecheck + 47 Unit Tests + Manifest)** | \`${{ needs.quality-gate.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 **Matrix Tests (Ordering, Admin, Fulfillment, Generated)** | \`${{ needs.test.result }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌉 **Cross-App E2E Bridge** | \`${{ needs.e2e-bridge.result }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🐳 **Docker Smoke Verification** | \`${{ needs.docker.result }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 📊 **Allure Compilation** | \`${{ needs.allure-report.result }}\` |" >> $GITHUB_STEP_SUMMARY

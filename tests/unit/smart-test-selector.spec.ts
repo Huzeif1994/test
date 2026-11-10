@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { selectTests, normalizePath } from '../../scripts/smart-test-selector';
+import { selectTests, normalizePath, getCiSelection } from '../../scripts/smart-test-selector';
 
 test.describe('Smart Test Selector — Unit Test Suite', () => {
   test('should normalize Windows backslashes to forward slashes', () => {
@@ -19,7 +19,7 @@ test.describe('Smart Test Selector — Unit Test Suite', () => {
       failureReason: 'git diff failed (shallow clone)',
     });
     expect(result.allTests).toBeTruthy();
-    expect(result.projects.size).toBe(4);
+    expect(result.projects.size).toBe(5);
     expect(result.isGitTrusted).toBeFalsy();
     expect(result.reason).toContain('Git change calculation is uncertain');
   });
@@ -51,20 +51,20 @@ test.describe('Smart Test Selector — Unit Test Suite', () => {
   test('should trigger full suite when shared BasePage.ts is modified', () => {
     const result = selectTests(['pages/BasePage.ts']);
     expect(result.allTests).toBeTruthy();
-    expect(result.projects.size).toBe(4);
+    expect(result.projects.size).toBe(5);
     expect(result.reason).toContain('Shared architectural dependency');
   });
 
   test('should trigger full suite when shared fixtures/ are modified', () => {
     const result = selectTests(['fixtures/pages.ts']);
     expect(result.allTests).toBeTruthy();
-    expect(result.projects.size).toBe(4);
+    expect(result.projects.size).toBe(5);
   });
 
   test('should trigger full suite when global configuration changes', () => {
     const result = selectTests(['playwright.config.ts']);
     expect(result.allTests).toBeTruthy();
-    expect(result.projects.size).toBe(4);
+    expect(result.projects.size).toBe(5);
   });
 
   test('should detect documentation-only modifications', () => {
@@ -77,7 +77,33 @@ test.describe('Smart Test Selector — Unit Test Suite', () => {
   test('should trigger fail-safe full suite on unknown/unmapped source files', () => {
     const result = selectTests(['legacy/custom-unmapped-module.ts']);
     expect(result.allTests).toBeTruthy();
-    expect(result.projects.size).toBe(4);
+    expect(result.projects.size).toBe(5);
     expect(result.reason).toContain('Defaulting to full test suite for fail-safe safety');
+  });
+
+  test('should execute generated tests when selected by the CI selector', () => {
+    const selection = selectTests(['tests/generated/us-001-example.spec.ts']);
+    const ciSelection = getCiSelection(selection);
+
+    expect(ciSelection.matrixProjects).toEqual(['generated']);
+    expect(ciSelection.runBridge).toBeFalsy();
+    expect(ciSelection.runTests).toBeTruthy();
+  });
+
+  test('full CI selection should include every browser project', () => {
+    const selection = selectTests(['legacy/custom-unmapped-module.ts']);
+    const ciSelection = getCiSelection(selection);
+
+    expect(ciSelection.matrixProjects).toEqual(['ordering', 'admin', 'fulfillment', 'generated']);
+    expect(ciSelection.runBridge).toBeTruthy();
+  });
+
+  test('unit-only changes rely on the quality gate without scheduling browser jobs', () => {
+    const selection = selectTests(['tests/unit/smart-test-selector.spec.ts']);
+    const ciSelection = getCiSelection(selection);
+
+    expect(ciSelection.matrixProjects).toEqual([]);
+    expect(ciSelection.runBridge).toBeFalsy();
+    expect(ciSelection.runTests).toBeFalsy();
   });
 });

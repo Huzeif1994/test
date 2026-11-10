@@ -31,7 +31,7 @@
     "allure:open": "allure open allure-report",
     "allure:serve": "allure serve allure-results",
     "allure:clean": "node -e \"require('fs').rmSync('allure-results',{recursive:true,force:true});require('fs').rmSync('allure-report',{recursive:true,force:true})\"",
-    "docker:allure": "node -e \"const { spawnSync } = require('child_process'); spawnSync('npm', ['run', 'docker:test'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:generate'], { stdio: 'inherit', shell: true }); spawnSync('npm', ['run', 'allure:open'], { stdio: 'inherit', shell: true });\""
+    "docker:allure": "node -e \"const { spawnSync } = require('child_process'); for (const script of ['docker:test', 'allure:generate', 'allure:open']) { const result = spawnSync('npm', ['run', script], { stdio: 'inherit', shell: process.platform === 'win32' }); if (result.error) { console.error(result.error); process.exit(1); } if (result.status !== 0) process.exit(result.status || 1); }\""
   },
   "keywords": [],
   "author": "",
@@ -40,10 +40,17 @@
   "devDependencies": {
     "@playwright/test": "1.64.0",
     "@types/node": "^26.6.4",
-    "allure": "^3.20.1",
+    "allure": "^3.33.0",
     "allure-playwright": "^3.13.0",
     "dotenv": "^18.0.7",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "allure": {
+      "follow-redirects": "^1.16.3",
+      "glob": "^14.0.2",
+      "markdown-it": "^14.3.3"
+    }
   }
 }

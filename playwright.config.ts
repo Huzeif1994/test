@@ -126,7 +126,7 @@ export default defineConfig({
     {
       name: 'fulfillment',
       testDir: './tests/fulfillment',
-      dependencies: ['setup-fulfillment'],
+      dependencies: ['setup-ordering', 'setup-fulfillment'],
       use: {
         ...desktopChrome,
         baseURL: config.fulfillment.baseUrl,
@@ -155,4 +155,3 @@ export default defineConfig({
     },
   ],
 });
-

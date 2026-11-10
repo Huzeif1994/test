@@ -12,6 +12,15 @@ export interface SelectionResult {
   reason: string;
 }
 
+export interface CiSelectionResult {
+  matrixProjects: string[];
+  runBridge: boolean;
+  runTests: boolean;
+}
+
+const allCiProjects = ['ordering', 'admin', 'fulfillment', 'e2e-bridge', 'generated'];
+const ciMatrixProjects = ['ordering', 'admin', 'fulfillment', 'generated'];
+
 /**
  * Normalizes file path to forward slashes
  */
@@ -113,7 +122,7 @@ export function selectTests(
   const isGitTrusted = options.isGitTrusted ?? true;
   const projects = new Set<string>();
   const testFiles = new Set<string>();
-  const allProjectsList = ['ordering', 'fulfillment', 'admin', 'e2e-bridge'];
+  const allProjectsList = allCiProjects;
 
   // Fail-Safe: If Git state is untrusted (shallow clone, missing commits, git errors), run all tests
   if (!isGitTrusted) {
@@ -246,9 +255,6 @@ export function selectTests(
     // Agile user stories and generated test plans
     if (file.includes('user-stories/') || file.includes('test-plans/') || file.includes('tests/generated/')) {
       projects.add('generated');
-      projects.add('ordering');
-      projects.add('fulfillment');
-      projects.add('e2e-bridge');
       testFiles.add('tests/generated/');
       matched = true;
     }
@@ -290,6 +296,30 @@ export function selectTests(
   };
 }
 
+export function getCiSelection(selection: SelectionResult): CiSelectionResult {
+  let matrixProjects: string[];
+  const unitOnly = selection.projects.size === 0 && selection.testFiles.has('tests/unit/');
+
+  if (selection.allTests) {
+    matrixProjects = ciMatrixProjects;
+  } else {
+    matrixProjects = ciMatrixProjects.filter(project => selection.projects.has(project));
+    if (
+      matrixProjects.length === 0 &&
+      !selection.docsOnly &&
+      !unitOnly &&
+      !selection.projects.has('e2e-bridge')
+    ) {
+      matrixProjects = ciMatrixProjects;
+    }
+  }
+
+  const runBridge = selection.allTests || selection.projects.has('e2e-bridge');
+  const runTests = !selection.docsOnly && (matrixProjects.length > 0 || runBridge);
+
+  return { matrixProjects, runBridge, runTests };
+}
+
 // CLI Execution
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -307,10 +337,11 @@ if (require.main === module) {
   // Handle explicit TEST_SCOPE override if provided (e.g. via workflow_dispatch)
   const testScope = process.env.TEST_SCOPE?.trim().toLowerCase();
   if (testScope && testScope !== 'smart') {
+    selection.docsOnly = false;
     if (testScope === 'full') {
       selection.allTests = true;
       selection.reason = 'Manual full regression override requested via TEST_SCOPE=full.';
-    } else if (['ordering', 'admin', 'fulfillment'].includes(testScope)) {
+    } else if (['ordering', 'admin', 'fulfillment', 'generated'].includes(testScope)) {
       selection.allTests = false;
       selection.projects = new Set([testScope]);
       selection.reason = `Manual targeted test scope override requested via TEST_SCOPE=${testScope}.`;
@@ -322,20 +353,7 @@ if (require.main === module) {
   }
 
   if (isCi) {
-    const allStandalone = ['ordering', 'admin', 'fulfillment'];
-    let matrixProjects: string[] = [];
-
-    if (selection.allTests) {
-      matrixProjects = allStandalone;
-    } else {
-      matrixProjects = allStandalone.filter(p => selection.projects.has(p));
-      if (matrixProjects.length === 0 && !selection.docsOnly && !selection.projects.has('e2e-bridge')) {
-        matrixProjects = allStandalone;
-      }
-    }
-
-    const runBridge = selection.allTests || selection.projects.has('e2e-bridge');
-    const runTests = !selection.docsOnly && (matrixProjects.length > 0 || runBridge);
+    const { matrixProjects, runBridge, runTests } = getCiSelection(selection);
     const runId = process.env.RUN_ID || process.env.GITHUB_RUN_ID || `run_${Date.now()}`;
 
     console.log('\n==================================================');
