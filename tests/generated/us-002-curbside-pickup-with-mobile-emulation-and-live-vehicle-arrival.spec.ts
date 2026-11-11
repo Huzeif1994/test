@@ -63,7 +63,7 @@ test.describe('US-002: Curbside Pickup with Mobile Emulation and Live Vehicle Ar
       });
 
       await test.step('WHEN: Customer adds product to cart, proceeds to checkout, and selects "Curbside Pickup"', async () => {
-        await catalogPage.addProductToCart('Curbside Pickup');
+        await catalogPage.addProductToCart();
               await catalogPage.openCartAndProceed();
               await checkoutPage.proceedToCheckout();
       });
@@ -73,7 +73,7 @@ test.describe('US-002: Curbside Pickup with Mobile Emulation and Live Vehicle Ar
               await checkoutPage.placeOrder();
               await checkoutPage.clickViewOrderOnThankYouPage();
               placedOrderNumber = await checkoutPage.getLatestOrderNumber();
-              confirmationCode = await checkoutPage.getConfirmationCode();
+              confirmationCode = await checkoutPage.getConfirmationCode(placedOrderNumber);
               console.log('Placed Order:', placedOrderNumber, 'Code:', confirmationCode);
       });
 

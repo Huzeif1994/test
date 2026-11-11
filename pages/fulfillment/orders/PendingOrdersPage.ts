@@ -144,7 +144,7 @@ export class PendingOrdersPage extends BaseOrdersPage {
    */
   async waitForOrderInPending(orderNumber: string, maxAttempts: number = 15, retryIntervalMs: number = 3000): Promise<Locator> {
     console.log(`Fulfillment: Waiting for order "${orderNumber}" in Pending Orders (max attempts: ${maxAttempts})...`);
-    const targetRow = this.page.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: orderNumber }).first();
+    const targetRow = this.tableRows.filter({ hasText: orderNumber }).first();
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       await this.search(orderNumber);

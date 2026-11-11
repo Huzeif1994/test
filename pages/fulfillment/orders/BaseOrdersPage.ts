@@ -18,7 +18,7 @@ export abstract class BaseOrdersPage extends BasePage {
 
     this.tableTitle = page.locator('.tableTitle').first();
     this.searchInput = page.locator('input[placeholder="Search"]').first();
-    this.tableRows = page.locator('.q-table tbody tr.cursor-pointer');
+    this.tableRows = page.locator('.q-table tbody tr.cursor-pointer, .q-table tbody tr, .ftx-table__body .ftx-table__tr, table tbody tr');
     this.loadingSpinner = page.locator('.q-table__loading, .q-spinner').first();
     this.noDataLabel = page.locator('.no-data, text="No record(s) found."').first();
     this.brandStoreFilter = page.locator('.select-ellipsis, label:has-text("Select Brand Store")').first();
@@ -114,11 +114,11 @@ export abstract class BaseOrdersPage extends BasePage {
     await this.dismissPromoBanners();
 
     let row = this.tableRows.filter({ hasText: orderNumber }).first();
-    // If not visible (e.g. initial table response raced and overwrote), re-trigger search
-    if (!(await row.isVisible({ timeout: 2000 }).catch(() => false))) {
+    // Wait up to 6 seconds for row to appear before re-attempting search
+    if (!(await row.waitFor({ state: 'visible', timeout: 6000 }).then(() => true).catch(() => false))) {
       console.log(`Order ${orderNumber} not visible in table, re-triggering search...`);
-      await this.clearSearch();
       await this.search(orderNumber);
+      await this.expectTableLoaded();
       row = this.tableRows.filter({ hasText: orderNumber }).first();
     }
 

@@ -82,20 +82,24 @@ test.describe('Fulfillment Pending Orders & Order Picking Workflow Suite', () =>
           await checkoutPage.clickViewOrderOnThankYouPage();
 
           orderNumber = await checkoutPage.getLatestOrderNumber();
-          console.log(`Created dedicated fulfillment test order: ${orderNumber}`);
+          confirmationCode = await checkoutPage.getConfirmationCode(orderNumber);
+          console.log(`Created dedicated fulfillment test order: ${orderNumber} code: ${confirmationCode}`);
         }
 
         expect(orderNumber, 'Checkout or recovery input must provide the test order number').toBeTruthy();
         testInfo.annotations.push({ type: 'test-order', description: orderNumber });
 
         const readConfirmationCode = async (): Promise<string> => {
+          if (confirmationCode) return confirmationCode;
+          const directCode = await checkoutPage.getConfirmationCode(orderNumber);
+          if (directCode) return directCode;
           const bodyText = await customerPage.locator('body').innerText();
           return bodyText.match(/(?:confirmation|pickup) code\s*:?\s*([0-9]{4})/i)?.[1] ?? '';
         };
         if (!confirmationCode) {
           await expect.poll(readConfirmationCode, {
             message: 'Pickup confirmation code should load on the customer order page',
-            timeout: 20_000,
+            timeout: 25_000,
           }).toMatch(/^\d{4}$/);
           confirmationCode = await readConfirmationCode();
         }

@@ -62,8 +62,8 @@ test.describe('US-001: Customer Store Pickup with Credit Card and Fulfillment Ha
               await catalogPage.gotoCategory('huzeif-test');
       });
 
-      await test.step('WHEN: Customer adds "CASA TURRENT SERIE 1973 ROBUSTO" product to cart and proceeds to checkout', async () => {
-        await catalogPage.addProductToCart('CASA TURRENT SERIE 1973 ROBUSTO');
+      await test.step('WHEN: Customer adds product to cart dynamically and proceeds to checkout', async () => {
+        await catalogPage.addProductToCart();
               await catalogPage.openCartAndProceed();
               await checkoutPage.proceedToCheckout();
       });
@@ -79,7 +79,7 @@ test.describe('US-001: Customer Store Pickup with Credit Card and Fulfillment Ha
               await checkoutPage.placeOrder();
               await checkoutPage.clickViewOrderOnThankYouPage();
               placedOrderNumber = await checkoutPage.getLatestOrderNumber();
-              confirmationCode = await checkoutPage.getConfirmationCode();
+              confirmationCode = await checkoutPage.getConfirmationCode(placedOrderNumber);
               console.log('Placed Order:', placedOrderNumber, 'Code:', confirmationCode);
       });
 

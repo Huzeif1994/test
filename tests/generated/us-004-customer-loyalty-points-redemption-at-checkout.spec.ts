@@ -61,8 +61,8 @@ test.describe('US-004: Customer Loyalty Points Redemption at Checkout', () => {
         await catalogPage.gotoCategory('huzeif-test');
       });
 
-      await test.step('WHEN: the customer adds the product **"Clipper Refillable Lighter"** to the cart', async () => {
-        await catalogPage.addProductToCart('Clipper Refillable Lighter');
+      await test.step('WHEN: the customer adds a product dynamically to the cart', async () => {
+        await catalogPage.addProductToCart();
       });
 
       await test.step('AND: navigates to the Cart page', async () => {

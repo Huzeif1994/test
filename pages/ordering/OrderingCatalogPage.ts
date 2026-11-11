@@ -168,7 +168,7 @@ export class OrderingCatalogPage extends BasePage {
   }
 
   /**
-   * Add a product to cart by name or the first available product
+   * Add a product to cart by name or dynamically select the first available in-stock product
    */
   async addProductToCart(productName?: string): Promise<void> {
     // 1. If cart already has items, no need to add duplicate item
@@ -179,69 +179,75 @@ export class OrderingCatalogPage extends BasePage {
     }
 
     let targetBtn: Locator | null = null;
+
+    // 2. If a specific product was requested, try locating its card first
     if (productName) {
-      const card = this.page.locator('.q-card, .product-card, [class*="product-card"]').filter({
+      const card = this.page.locator('.q-card, .product-card, [class*="product-card"], .product-items--card').filter({
         hasText: new RegExp(productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
       }).first();
-      if (await card.isVisible({ timeout: 4000 }).catch(() => false)) {
+
+      if (await card.isVisible({ timeout: 2500 }).catch(() => false)) {
         await card.scrollIntoViewIfNeeded().catch(() => {});
 
         // If card already has quantity controls [trash] 1 [+], it's already in the cart
         const inCartControls = card.locator('button:has-text("+"), button i:has-text("delete"), .q-field, input').first();
-        if (await inCartControls.isVisible({ timeout: 1200 }).catch(() => false)) {
+        if (await inCartControls.isVisible({ timeout: 1000 }).catch(() => false)) {
           console.log(`Product "${productName}" is already in the cart.`);
           return;
         }
 
         const cardAddBtn = card.locator('.add-cart, .btn, button, .q-btn, [role="button"]').filter({ hasText: /Add to Cart/i }).first();
-        if (await cardAddBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (await cardAddBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           targetBtn = cardAddBtn;
+          console.log(`Located requested product card: "${productName}"`);
         }
+      } else {
+        console.log(`⚠️ Product "${productName}" not present in active category. Selecting first available product dynamically.`);
       }
     }
 
+    // 3. Dynamic Selection: pick whatever product card is visible on current page
     if (!targetBtn) {
-      const cardWithControls = this.page.locator('.product-items--card:visible, .product-card:visible').filter({
+      // Check if an item is already added with quantity selector
+      const cardWithControls = this.page.locator('.product-items--card:visible, .product-card:visible, .q-card:visible').filter({
         has: this.page.locator('button:has-text("+"), button i:has-text("delete"), .q-field, input')
       }).first();
 
-      const addBtn = this.page.locator('.product-items--card:visible, .product-card:visible')
-        .locator('.add-cart, .btn, button, .q-btn, [role="button"]')
-        .filter({ hasText: /Add to Cart/i })
-        .first();
-
-      if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        targetBtn = addBtn;
-      } else if (await cardWithControls.isVisible({ timeout: 1500 }).catch(() => false)) {
+      if (await cardWithControls.isVisible({ timeout: 1500 }).catch(() => false)) {
         console.log('An item is already in the cart, proceeding.');
         return;
-      } else {
-        const anyAddBtn = this.page.locator('.add-cart:visible, .btn:visible, button:visible, .q-btn:visible, [role="button"]:visible').filter({ hasText: /Add to Cart/i }).first();
-        if (await anyAddBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-          targetBtn = anyAddBtn;
-        }
+      }
+
+      // Find any visible Add to Cart button on the page
+      const dynamicAddBtn = this.page.locator(
+        'button:visible, .q-btn:visible, .add-cart:visible, a:visible, [role="button"]:visible'
+      ).filter({ hasText: /Add to Cart/i }).first();
+
+      if (await dynamicAddBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+        targetBtn = dynamicAddBtn;
+        console.log('Selected first available product dynamically on current page.');
       }
     }
 
-    if (targetBtn && await targetBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+    if (targetBtn && await targetBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await targetBtn.scrollIntoViewIfNeeded().catch(() => {});
       await targetBtn.click({ force: true });
-      await this.page.waitForTimeout(2500);
+      await this.page.waitForTimeout(2000);
       return;
     }
 
-    // Resilience Fallback: If target category is empty or product not found, dynamically find an active category with products
-    console.log(`⚠️ [Catalog Resilience] Product "${productName || 'Default'}" not found in current category. Discovering active physical category...`);
+    // 4. Resilience Fallback: Only if current page has NO products at all, discover active category
+    console.log(`⚠️ [Catalog Resilience] No available products found in current category. Discovering active category...`);
     await this.discoverAndNavigateToActiveCategory();
 
-    const discoveredAddBtn = this.page.locator('.add-cart:visible, .btn:visible, button:visible, .q-btn:visible, [role="button"]:visible')
-      .filter({ hasText: /Add to Cart/i })
-      .first();
+    const discoveredAddBtn = this.page.locator(
+      'button:visible, .q-btn:visible, .add-cart:visible, a:visible, [role="button"]:visible'
+    ).filter({ hasText: /Add to Cart/i }).first();
 
     await discoveredAddBtn.waitFor({ state: 'visible', timeout: 15000 });
     await discoveredAddBtn.scrollIntoViewIfNeeded().catch(() => {});
     await discoveredAddBtn.click({ force: true });
-    await this.page.waitForTimeout(2500);
+    await this.page.waitForTimeout(2000);
   }
 
   /**

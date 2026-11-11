@@ -415,38 +415,52 @@ export class OrderingCheckoutPage extends BasePage {
 
   /**
    * Extract Pickup Confirmation Code from customer Order Details, Thank You page, or body
+   * Robust with polling and orders-list fallback.
    */
-  async getConfirmationCode(): Promise<string> {
-    // Auto-waits handle synchronization directly
+  async getConfirmationCode(orderNumber?: string): Promise<string> {
+    const startTime = Date.now();
+    const timeoutMs = 15000;
 
-    // 1. Direct match on <li><span>Confirmation Code</span><strong>7874</strong></li>
-    const strongCode = this.page.locator('li').filter({ hasText: /Confirmation Code/i }).locator('strong').first();
-    if (await strongCode.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const code = (await strongCode.innerText()).trim();
-      if (/^\d{4}$/.test(code)) return code;
+    while (Date.now() - startTime < timeoutMs) {
+      // 1. Direct match on <li><span>Confirmation Code</span><strong>7874</strong></li>
+      const strongCode = this.page.locator('li').filter({ hasText: /Confirmation Code/i }).locator('strong').first();
+      if (await strongCode.isVisible({ timeout: 1500 }).catch(() => false)) {
+        const code = (await strongCode.innerText()).trim();
+        if (/^\d{4}$/.test(code)) return code;
+      }
+
+      // 2. Text match: Confirmation Code: XXXX or Pickup Code: XXXX
+      const codeLocator = this.page.locator('text=/confirmation code|pickup code|handover code|pickup pin/i').first();
+      if (await codeLocator.isVisible({ timeout: 1500 }).catch(() => false)) {
+        const text = await codeLocator.innerText();
+        const match = text.match(/(?:code|pin)\s*:?\s*([0-9]{4})/i);
+        if (match) return match[1].trim();
+      }
+
+      // 3. Class / Badge match
+      const badgeCode = this.page.locator('.pickup-code, .confirmation-code, .text-h5, .text-h6, .q-badge')
+        .filter({ hasText: /^[0-9]{4}$/ })
+        .first();
+      if (await badgeCode.isVisible({ timeout: 1000 }).catch(() => false)) {
+        return (await badgeCode.innerText()).trim();
+      }
+
+      // 4. Full body text search
+      const bodyText = await this.page.locator('body').innerText().catch(() => '');
+      const bodyMatch = bodyText.match(/confirmation code\s*[:\n\r\s]*([0-9]{4})/i) ||
+                       bodyText.match(/pickup code\s*[:\n\r\s]*([0-9]{4})/i);
+      if (bodyMatch) return bodyMatch[1].trim();
+
+      await this.page.waitForTimeout(1000);
     }
 
-    // 2. Text match: Confirmation Code: XXXX or Pickup Code: XXXX
-    const codeLocator = this.page.locator('text=/confirmation code|pickup code|handover code|pickup pin/i').first();
-    if (await codeLocator.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const text = await codeLocator.innerText();
-      const match = text.match(/(?:code|pin)\s*:?\s*([0-9]{4})/i);
-      if (match) return match[1].trim();
+    // 5. Fallback: retrieve code from customer /orders page
+    try {
+      const fallbackCode = await this.fetchConfirmationCodeFromOrdersList(orderNumber);
+      if (fallbackCode) return fallbackCode;
+    } catch {
+      // ignore fallback error
     }
-
-    // 3. Class / Badge match
-    const badgeCode = this.page.locator('.pickup-code, .confirmation-code, .text-h5, .text-h6, .q-badge')
-      .filter({ hasText: /^[A-Z0-9]{4,8}$/ })
-      .first();
-    if (await badgeCode.isVisible({ timeout: 3000 }).catch(() => false)) {
-      return (await badgeCode.innerText()).trim();
-    }
-
-    // 4. Full body text search
-    const bodyText = await this.page.locator('body').innerText().catch(() => '');
-    const bodyMatch = bodyText.match(/confirmation code\s*[:\n\r\s]*([0-9]{4})/i) ||
-                     bodyText.match(/pickup code\s*[:\n\r\s]*([0-9]{4})/i);
-    if (bodyMatch) return bodyMatch[1].trim();
 
     return '';
   }

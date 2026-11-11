@@ -76,10 +76,10 @@ test.describe('E2E Flow 1: In-Store Pickup with Credit Card & Handover Completio
     const catalogPage = new OrderingCatalogPage(customerPage);
     const checkoutPage = new OrderingCheckoutPage(customerPage);
 
-    await test.step('Customer clears cart, browses huzeif-test category, and proceeds to checkout', async () => {
+    await test.step('Customer clears cart, browses category, and proceeds to checkout', async () => {
       await checkoutPage.clearCartIfNotEmpty();
       await catalogPage.gotoCategory();
-      await catalogPage.addProductToCart('CASA TURRENT SERIE 1973 ROBUSTO');
+      await catalogPage.addProductToCart();
       await catalogPage.openCartAndProceed();
       await checkoutPage.proceedToCheckout();
     });
