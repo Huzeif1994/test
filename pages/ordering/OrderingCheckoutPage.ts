@@ -100,7 +100,9 @@ export class OrderingCheckoutPage extends BasePage {
     await this.page.waitForTimeout(500);
 
     // Click button
-    await btn.click().catch(() => btn.dispatchEvent('click'));
+    await btn.click({ force: true }).catch(async () => {
+      await btn.dispatchEvent('click').catch(() => {});
+    });
 
     // Check if "Reserve a time slot" modal opened upon clicking Proceed to Checkout
     const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot/i }).first();

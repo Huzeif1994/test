@@ -130,7 +130,7 @@ test.describe('Fulfillment Pending Orders & Order Picking Workflow Suite', () =>
 
       await test.step('Verify row actions and order detail controls', async () => {
         await pendingOrdersPage.search(orderNumber);
-        await pendingOrdersPage.openActionMenu(0);
+        await pendingOrdersPage.openActionMenu(orderNumber);
         await pendingOrdersPage.expectAll5Actions();
         await page.keyboard.press('Escape');
 

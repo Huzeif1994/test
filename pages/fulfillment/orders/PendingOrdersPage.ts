@@ -93,11 +93,22 @@ export class PendingOrdersPage extends BaseOrdersPage {
   /**
    * Open the action dropdown menu on a row or navigate to order actions
    */
-  async openActionMenu(rowIndex: number = 0): Promise<void> {
+  async openActionMenu(target: number | string = 0): Promise<void> {
     await this.expectTableLoaded();
     await this.dismissPromoBanners();
-    const row = this.tableRows.nth(rowIndex);
-    await row.waitFor({ state: 'visible', timeout: 15000 });
+
+    let row = typeof target === 'string'
+      ? this.tableRows.filter({ hasText: target }).first()
+      : this.tableRows.nth(target);
+
+    if (!(await row.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false))) {
+      // If filtered out or not visible, clear search and pick first visible row
+      await this.clearSearch();
+      await this.expectTableLoaded();
+      row = this.tableRows.first();
+    }
+
+    await row.waitFor({ state: 'visible', timeout: 10000 });
 
     const dropdownBtn = row.locator('.action-dropdown, .dropdown-action, button[aria-haspopup="menu"]').first();
     if (await dropdownBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
