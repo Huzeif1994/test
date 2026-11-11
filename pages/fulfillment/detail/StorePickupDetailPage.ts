@@ -159,21 +159,19 @@ export class StorePickupDetailPage extends BasePage {
     const submitBtn = dialog.locator('button').filter({ hasText: /^Submit$/i }).first();
     await submitBtn.waitFor({ state: 'visible', timeout: 5000 });
     await submitBtn.click();
-    await this.page.waitForTimeout(1500);
 
-    // If Quasar confirmation alert "Successfully Picked-Up!" appears, dismiss it cleanly
+    const successMessage = this.page.getByText(/Successfully Picked-Up!/i).first();
+    await expect(successMessage, 'Handover should show an explicit successful pickup confirmation').toBeVisible({ timeout: 15000 });
+
     const okBtn = this.page.getByRole('button', { name: /^OKAY$/i })
       .or(this.page.locator('button:has-text("OKAY")'))
       .or(this.page.locator('.q-dialog button, button').filter({ hasText: /OKAY|OK|Close/i }))
       .first();
     if (await okBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       console.log('Fulfillment Handover: Dismissed handover confirmation modal.');
-      await okBtn.click({ force: true }).catch(() => {});
-      await this.page.waitForTimeout(1000);
+      await okBtn.click();
     }
-    await this.page.locator('.q-dialog').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {});
-    await this.page.waitForURL(/\/(?:ready-orders|fulfilled-orders|dashboard|$)/i, { timeout: 10000 }).catch(() => {});
-    await this.page.waitForTimeout(2000);
+    await this.page.locator('.q-dialog').waitFor({ state: 'hidden', timeout: 15000 });
     console.log('Fulfillment Handover: Handover completed successfully (order fulfilled).');
   }
 }

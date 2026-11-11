@@ -94,35 +94,30 @@ export class OrderingCheckoutPage extends BasePage {
     const btn = this.page.getByRole('button', { name: /Proceed to Checkout/i })
       .or(this.page.locator('button, a').filter({ hasText: /Proceed to Checkout/i }))
       .first();
+    const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot/i }).first();
 
     await btn.waitFor({ state: 'visible', timeout: 20000 });
     await btn.scrollIntoViewIfNeeded().catch(() => {});
-    await this.page.waitForTimeout(500);
+    try {
+      await btn.click();
+    } catch (error) {
+      const transitioned = this.page.url().includes('/checkout') ||
+        await slotDialog.isVisible({ timeout: 1000 }).catch(() => false);
+      if (!transitioned) {
+        throw error;
+      }
+    }
 
-    // Click button
-    await btn.click({ force: true }).catch(async () => {
-      await btn.dispatchEvent('click').catch(() => {});
-    });
-
-    // Check if "Reserve a time slot" modal opened upon clicking Proceed to Checkout
-    const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot/i }).first();
     if (await slotDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
       console.log('Cart: "Reserve a time slot" dialog detected, selecting available slot...');
       await this.selectFirstAvailableTimeSlot(slotDialog);
     }
 
-    // Ensure transition to /checkout
-    for (let retry = 0; retry < 6; retry++) {
-      if (this.page.url().includes('/checkout')) break;
-      await this.page.waitForTimeout(1000);
-      if (await slotDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await this.selectFirstAvailableTimeSlot(slotDialog);
-      } else if (await btn.isVisible().catch(() => false)) {
-        await btn.click().catch(() => btn.dispatchEvent('click'));
-      }
+    if (!this.page.url().includes('/checkout') &&
+        await slotDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await this.selectFirstAvailableTimeSlot(slotDialog);
     }
 
-    // Wait for checkout URL
     await this.page.waitForURL(/\/checkout/i, { timeout: 60000 });
     await this.expectCheckoutLoaded();
   }
@@ -742,23 +737,27 @@ export class OrderingCheckoutPage extends BasePage {
    */
   async getLatestOrderNumber(): Promise<string> {
     // 1. Check URL first for the standard order ID format: e.g. 57854114352_37418
-    const urlMatch = this.page.url().match(/(\d{6,}_\d+)/);
-    if (urlMatch && urlMatch[1]) {
-      return urlMatch[1].trim();
-    }
+    for (let poll = 0; poll < 6; poll++) {
+      const urlMatch = this.page.url().match(/(\d{6,}_\d+)/);
+      if (urlMatch && urlMatch[1]) {
+        return urlMatch[1].trim();
+      }
 
-    // 2. Direct match on page text for Order Number: e.g. "Order Number: 17904293032_37414"
-    const orderNumEl = this.page.locator('li, div, p, span, h1, h2, h3, h4').filter({ hasText: /Order Number/i }).first();
-    if (await orderNumEl.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const text = await orderNumEl.innerText();
-      const match = text.match(/(\d{6,}_\d+)/);
-      if (match) return match[1].trim();
-    }
+      // 2. Direct match on page text for Order Number: e.g. "Order Number: 17904293032_37414"
+      const orderNumEl = this.page.locator('li, div, p, span, h1, h2, h3, h4').filter({ hasText: /Order Number/i }).first();
+      if (await orderNumEl.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const text = await orderNumEl.innerText();
+        const match = text.match(/(\d{6,}_\d+)/);
+        if (match) return match[1].trim();
+      }
 
-    // 3. Search entire body text for any standard order number pattern
-    const pageText = await this.page.locator('body').innerText().catch(() => '');
-    const bodyMatch = pageText.match(/(\d{6,}_\d+)/);
-    if (bodyMatch) return bodyMatch[1].trim();
+      // 3. Search entire body text for any standard order number pattern
+      const pageText = await this.page.locator('body').innerText().catch(() => '');
+      const bodyMatch = pageText.match(/(\d{6,}_\d+)/);
+      if (bodyMatch) return bodyMatch[1].trim();
+
+      await this.page.waitForTimeout(1000);
+    }
 
     // 4. Fallback: navigate to /orders to fetch the top order card, then return
     const currentUrl = this.page.url();

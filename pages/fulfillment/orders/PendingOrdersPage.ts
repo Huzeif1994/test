@@ -102,13 +102,21 @@ export class PendingOrdersPage extends BaseOrdersPage {
       : this.tableRows.nth(target);
 
     if (!(await row.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false))) {
-      // If filtered out or not visible, clear search and pick first visible row
-      await this.clearSearch();
-      await this.expectTableLoaded();
-      row = this.tableRows.first();
+      if (typeof target === 'string') {
+        await this.search(target);
+        row = this.tableRows.filter({ hasText: target }).first();
+      } else {
+        await this.clearSearch();
+        await this.expectTableLoaded();
+        row = this.tableRows.first();
+      }
     }
 
-    await row.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(row, typeof target === 'string'
+      ? `Pending order "${target}" should be visible after re-searching`
+      : `Pending order row ${target} should be visible`).toBeVisible({
+      timeout: typeof target === 'string' ? 15000 : 10000,
+    });
 
     const dropdownBtn = row.locator('.action-dropdown, .dropdown-action, button[aria-haspopup="menu"]').first();
     if (await dropdownBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
