@@ -36,7 +36,53 @@ export class ReadyOrdersPage extends BaseOrdersPage {
    */
   async openOrderForHandover(orderNumber?: string): Promise<void> {
     if (orderNumber) {
-      await this.clickOrderRow(orderNumber);
+      const receiptMatch = orderNumber.match(/_(\d+)$/);
+      const receiptNumber = receiptMatch ? receiptMatch[1] : orderNumber;
+
+      let found = false;
+      const maxAttempts = 10;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        await this.search(orderNumber);
+        await this.expectTableLoaded();
+
+        let row = this.page.locator('.q-table tbody tr.cursor-pointer:visible, .q-table tbody tr:visible, table tbody tr:visible')
+          .filter({ hasText: orderNumber })
+          .or(this.page.locator('.q-table tbody tr.cursor-pointer:visible, .q-table tbody tr:visible, table tbody tr:visible').filter({ hasText: receiptNumber }))
+          .first();
+
+        if (await row.isVisible({ timeout: 2500 }).catch(() => false)) {
+          await row.scrollIntoViewIfNeeded().catch(() => {});
+          await row.click();
+          found = true;
+          break;
+        }
+
+        if (receiptNumber !== orderNumber) {
+          await this.search(receiptNumber);
+          await this.expectTableLoaded();
+          row = this.page.locator('.q-table tbody tr.cursor-pointer:visible, .q-table tbody tr:visible, table tbody tr:visible')
+            .filter({ hasText: receiptNumber })
+            .first();
+          if (await row.isVisible({ timeout: 2500 }).catch(() => false)) {
+            await row.scrollIntoViewIfNeeded().catch(() => {});
+            await row.click();
+            found = true;
+            break;
+          }
+        }
+
+        if (attempt < maxAttempts) {
+          console.log(`Ready Orders: Order ${orderNumber} not synced yet, retrying with reload (attempt ${attempt}/${maxAttempts})...`);
+          await this.page.waitForTimeout(2000);
+          await this.page.reload({ waitUntil: 'domcontentloaded' });
+          await this.expectTableLoaded();
+        }
+      }
+
+      if (!found) {
+        // Fallback to clickOrderRow
+        await this.clickOrderRow(orderNumber);
+      }
     } else {
       await this.clickFirstOrderRow();
     }

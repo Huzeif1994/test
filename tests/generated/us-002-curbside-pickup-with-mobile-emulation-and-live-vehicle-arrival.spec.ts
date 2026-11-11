@@ -8,6 +8,7 @@ import { PendingOrdersPage } from '../../pages/fulfillment/orders/PendingOrdersP
 import { OrderDetailPage } from '../../pages/fulfillment/orders/OrderDetailPage';
 import { PickOrderDetailPage } from '../../pages/fulfillment/picking/PickOrderDetailPage';
 import { ItemInfoDrawer } from '../../pages/fulfillment/modals/ItemInfoDrawer';
+import { DeliveryHandlingDrawer } from '../../pages/fulfillment/modals/DeliveryHandlingDrawer';
 import { PickOrderPackagePage } from '../../pages/fulfillment/picking/PickOrderPackagePage';
 import { AssignStagingDrawer } from '../../pages/fulfillment/modals/AssignStagingDrawer';
 import { ReadyOrdersPage } from '../../pages/fulfillment/orders/ReadyOrdersPage';
@@ -49,6 +50,7 @@ test.describe('US-002: Curbside Pickup with Mobile Emulation and Live Vehicle Ar
     const orderDetailPage = new OrderDetailPage(fulfillmentPage);
     const pickOrderDetailPage = new PickOrderDetailPage(fulfillmentPage);
     const itemInfoDrawer = new ItemInfoDrawer(fulfillmentPage);
+    const deliveryHandlingDrawer = new DeliveryHandlingDrawer(fulfillmentPage);
     const pickOrderPackagePage = new PickOrderPackagePage(fulfillmentPage);
     const assignStagingDrawer = new AssignStagingDrawer(fulfillmentPage);
     const readyOrdersPage = new ReadyOrdersPage(fulfillmentPage);
@@ -64,83 +66,113 @@ test.describe('US-002: Curbside Pickup with Mobile Emulation and Live Vehicle Ar
 
       await test.step('WHEN: Customer adds product to cart, proceeds to checkout, and selects "Curbside Pickup"', async () => {
         await catalogPage.addProductToCart();
-              await catalogPage.openCartAndProceed();
-              await checkoutPage.proceedToCheckout();
+        await catalogPage.openCartAndProceed();
+        await checkoutPage.proceedToCheckout();
+        await checkoutPage.selectCurbsidePickup();
       });
 
       await test.step('AND: Customer turns off "Pay At Store", selects Credit Card, places order, and captures Order ID and Confirmation Code', async () => {
+        await checkoutPage.turnOffPayAtStore();
+        await checkoutPage.selectCreditOrDebitCard();
         await checkoutPage.acceptTerms();
-              await checkoutPage.placeOrder();
-              await checkoutPage.clickViewOrderOnThankYouPage();
-              placedOrderNumber = await checkoutPage.getLatestOrderNumber();
-              confirmationCode = await checkoutPage.getConfirmationCode(placedOrderNumber);
-              console.log('Placed Order:', placedOrderNumber, 'Code:', confirmationCode);
+        await checkoutPage.placeOrder();
+        await checkoutPage.clickViewOrderOnThankYouPage();
+        placedOrderNumber = await checkoutPage.getLatestOrderNumber();
+        confirmationCode = await checkoutPage.getConfirmationCode(placedOrderNumber);
+        console.log('Placed Order:', placedOrderNumber, 'Code:', confirmationCode);
       });
 
       await test.step('WHEN: Fulfillment employee opens Pending Orders, picks all items, and marks order Ready', async () => {
         await fulfillmentPage.goto('/pending-order', { waitUntil: 'domcontentloaded' });
-              await pendingOrdersPage.expectOnPendingPage();
-              await pendingOrdersPage.expectTableLoaded();
-              if (placedOrderNumber) {
-                await pendingOrdersPage.waitForOrderInPending(placedOrderNumber);
-              }
+        await pendingOrdersPage.expectOnPendingPage();
+        await pendingOrdersPage.expectTableLoaded();
+        if (placedOrderNumber) {
+          await pendingOrdersPage.waitForOrderInPending(placedOrderNumber);
+          await pendingOrdersPage.openOrderDetail(placedOrderNumber);
+          await orderDetailPage.expectOnOrderDetail();
+          await orderDetailPage.clickStartPicking();
+          await pickOrderDetailPage.expectOnPickOrderPage();
+          await pickOrderDetailPage.pickAllItems(itemInfoDrawer);
+          await pickOrderDetailPage.clickNext();
+
+          if (await deliveryHandlingDrawer.isDrawerVisible(6000)) {
+            await deliveryHandlingDrawer.completeDeliveryHandling({
+              containsType: 'Contains Both',
+              instructions: 'Handle with care. Test order.',
+            });
+          }
+
+          const onAssign = await fulfillmentPage.waitForURL(/assign-package/i, { timeout: 20000 }).then(() => true).catch(() => false);
+          if (onAssign) {
+            await pickOrderPackagePage.expectOnAssignPackagePage();
+            await pickOrderPackagePage.selectAllPackages();
+            await pickOrderPackagePage.clickAssignStagingArea();
+            await assignStagingDrawer.expectDrawerOpen();
+            await assignStagingDrawer.selectStagingArea();
+            await assignStagingDrawer.clickSave();
+            await pickOrderPackagePage.clickMarkReady();
+            await pickOrderPackagePage.expectOrderCompletedAndRedirected();
+          } else {
+            const directReady = fulfillmentPage.locator('button, .q-btn').filter({ hasText: /^MARK READY$/i }).first();
+            if (await directReady.isVisible({ timeout: 5000 }).catch(() => false)) {
+              await directReady.click();
+              await fulfillmentPage.waitForURL(/pending-order/i, { timeout: 15000 }).catch(() => {});
+            }
+          }
+        }
       });
 
-      await test.step('WHEN: Customer opens order in Mobile Device View (Pixel 5)', async () => {
+      await test.step('WHEN: Customer opens order in Mobile Device View (Pixel 5) and submits arrival details', async () => {
         const mobileContext = await browser.newContext({
-                ...devices['Pixel 5'],
-                storageState: '.auth/ordering.json',
-                baseURL: config.ordering.baseUrl,
-              });
-              const mobilePage = await mobileContext.newPage();
-              const mobileCheckout = new OrderingCheckoutPage(mobilePage);
-              await mobilePage.goto(customerPage.url(), { waitUntil: 'domcontentloaded' });
-              await mobileCheckout.completeMobileCurbsideArrival({
-                spot: 'Spot - A',
-                color: 'Black',
-                maker: 'Acura',
-                model: 'CL',
-              });
-              await mobileContext.close();
-      });
-
-      await test.step('AND: Customer verifies "Ready For Pickup" status and completes mobile vehicle arrival submission with Spot "Spot - A", Color "Black", Maker "Acura", Model "CL"', async () => {
-        const mobileContext = await browser.newContext({
-                ...devices['Pixel 5'],
-                storageState: '.auth/ordering.json',
-                baseURL: config.ordering.baseUrl,
-              });
-              const mobilePage = await mobileContext.newPage();
-              const mobileCheckout = new OrderingCheckoutPage(mobilePage);
-              await mobilePage.goto(customerPage.url(), { waitUntil: 'domcontentloaded' });
-              await mobileCheckout.completeMobileCurbsideArrival({
-                spot: 'Spot - A',
-                color: 'Black',
-                maker: 'Acura',
-                model: 'CL',
-              });
-              await mobileContext.close();
+          ...devices['Pixel 5'],
+          storageState: '.auth/ordering.json',
+          baseURL: config.ordering.baseUrl,
+        });
+        const mobilePage = await mobileContext.newPage();
+        const mobileCheckout = new OrderingCheckoutPage(mobilePage);
+        const targetUrl = customerPage.url().includes('/track-order/')
+          ? customerPage.url()
+          : (placedOrderNumber ? `/track-order/${placedOrderNumber}` : customerPage.url());
+        await mobilePage.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+        await mobileCheckout.completeMobileCurbsideArrival({
+          spot: 'Spot - A',
+          color: 'Black',
+          maker: 'Acura',
+          model: 'CL',
+        });
+        await mobileContext.close();
       });
 
       await test.step('WHEN: Fulfillment employee navigates to Ready Orders and opens the curbside order', async () => {
         await fulfillmentSidebar.goToReady();
-              await readyOrdersPage.expectOnReadyPage();
-              await readyOrdersPage.expectTableLoaded();
-              if (placedOrderNumber) {
-                await readyOrdersPage.search(placedOrderNumber);
-                await readyOrdersPage.openOrderForHandover(placedOrderNumber);
-              }
+        await readyOrdersPage.expectOnReadyPage();
+        await readyOrdersPage.expectTableLoaded();
+        if (placedOrderNumber) {
+          await readyOrdersPage.openOrderForHandover(placedOrderNumber);
+        }
       });
 
       await test.step('THEN: Fulfillment employee verifies Curbside Pickup method and Parking Spot / Car Info blocks', async () => {
-        await checkoutPage.selectCurbsidePickup();
-              await checkoutPage.turnOffPayAtStore();
-              await checkoutPage.selectCreditOrDebitCard();
+        await storePickupDetailPage.expectOnOrderDetail();
+        await storePickupDetailPage.verifyCurbsideCarInfo({
+          spot: 'Spot - A',
+          company: 'Acura',
+          model: 'CL',
+          color: 'Black',
+        });
       });
 
       await test.step('AND: Fulfillment employee completes handover with confirmation code transitioning order to Fulfilled', async () => {
-        // Step: Fulfillment employee completes handover with confirmation code transitioning order to Fulfilled
-              await customerPage.waitForTimeout(1000);
+        await storePickupDetailPage.clickContinue();
+        if (confirmationCode) {
+          await storePickupDetailPage.enterConfirmationCode(confirmationCode);
+        }
+        await fulfillmentSidebar.goToFulfilled();
+        await fulfilledOrdersPage.expectOnFulfilledPage();
+        if (placedOrderNumber) {
+          await fulfilledOrdersPage.search(placedOrderNumber);
+          await fulfilledOrdersPage.expectOrderRowVisible(placedOrderNumber);
+        }
       });
 
     } finally {

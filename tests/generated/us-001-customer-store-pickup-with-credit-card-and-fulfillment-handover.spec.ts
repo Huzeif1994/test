@@ -8,6 +8,7 @@ import { PendingOrdersPage } from '../../pages/fulfillment/orders/PendingOrdersP
 import { OrderDetailPage } from '../../pages/fulfillment/orders/OrderDetailPage';
 import { PickOrderDetailPage } from '../../pages/fulfillment/picking/PickOrderDetailPage';
 import { ItemInfoDrawer } from '../../pages/fulfillment/modals/ItemInfoDrawer';
+import { DeliveryHandlingDrawer } from '../../pages/fulfillment/modals/DeliveryHandlingDrawer';
 import { PickOrderPackagePage } from '../../pages/fulfillment/picking/PickOrderPackagePage';
 import { AssignStagingDrawer } from '../../pages/fulfillment/modals/AssignStagingDrawer';
 import { ReadyOrdersPage } from '../../pages/fulfillment/orders/ReadyOrdersPage';
@@ -49,6 +50,7 @@ test.describe('US-001: Customer Store Pickup with Credit Card and Fulfillment Ha
     const orderDetailPage = new OrderDetailPage(fulfillmentPage);
     const pickOrderDetailPage = new PickOrderDetailPage(fulfillmentPage);
     const itemInfoDrawer = new ItemInfoDrawer(fulfillmentPage);
+    const deliveryHandlingDrawer = new DeliveryHandlingDrawer(fulfillmentPage);
     const pickOrderPackagePage = new PickOrderPackagePage(fulfillmentPage);
     const assignStagingDrawer = new AssignStagingDrawer(fulfillmentPage);
     const readyOrdersPage = new ReadyOrdersPage(fulfillmentPage);
@@ -94,39 +96,47 @@ test.describe('US-001: Customer Store Pickup with Credit Card and Fulfillment Ha
 
       await test.step('AND: Fulfillment employee initiates Start Picking and picks all required items', async () => {
         await pendingOrdersPage.openOrderDetail(placedOrderNumber);
-              await orderDetailPage.expectOnOrderDetail();
-              await orderDetailPage.clickStartPicking();
-              await pickOrderDetailPage.expectOnPickOrderPage();
-              await pickOrderDetailPage.pickAllItems(itemInfoDrawer);
-              await pickOrderDetailPage.clickNext();
+        await orderDetailPage.expectOnOrderDetail();
+        await orderDetailPage.clickStartPicking();
+        await pickOrderDetailPage.expectOnPickOrderPage();
+        await pickOrderDetailPage.pickAllItems(itemInfoDrawer);
+        await pickOrderDetailPage.clickNext();
+
+        if (await deliveryHandlingDrawer.isDrawerVisible(6000)) {
+          await deliveryHandlingDrawer.completeDeliveryHandling({
+            containsType: 'Contains Both',
+            instructions: 'Handle with care. Test order.',
+          });
+        }
       });
 
       await test.step('AND: Fulfillment employee completes package assignment and marks the order Ready', async () => {
-        const onAssign = await fulfillmentPage.waitForURL(/assign-package/i, { timeout: 10000 }).then(() => true).catch(() => false);
-              if (onAssign) {
-                await pickOrderPackagePage.selectAllPackages();
-                await pickOrderPackagePage.clickAssignStagingArea();
-                await assignStagingDrawer.expectDrawerOpen();
-                await assignStagingDrawer.selectStagingArea();
-                await assignStagingDrawer.clickSave();
-                await pickOrderPackagePage.clickMarkReady();
-                await pickOrderPackagePage.expectOrderCompletedAndRedirected();
-              } else {
-                const directReady = fulfillmentPage.locator('button').filter({ hasText: /^MARK READY$/i }).first();
-                if (await directReady.isVisible({ timeout: 4000 }).catch(() => false)) {
-                  await directReady.click();
-                }
-              }
+        const onAssign = await fulfillmentPage.waitForURL(/assign-package/i, { timeout: 20000 }).then(() => true).catch(() => false);
+        if (onAssign) {
+          await pickOrderPackagePage.expectOnAssignPackagePage();
+          await pickOrderPackagePage.selectAllPackages();
+          await pickOrderPackagePage.clickAssignStagingArea();
+          await assignStagingDrawer.expectDrawerOpen();
+          await assignStagingDrawer.selectStagingArea();
+          await assignStagingDrawer.clickSave();
+          await pickOrderPackagePage.clickMarkReady();
+          await pickOrderPackagePage.expectOrderCompletedAndRedirected();
+        } else {
+          const directReady = fulfillmentPage.locator('button, .q-btn').filter({ hasText: /^MARK READY$/i }).first();
+          if (await directReady.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await directReady.click();
+            await fulfillmentPage.waitForURL(/pending-order/i, { timeout: 15000 }).catch(() => {});
+          }
+        }
       });
 
       await test.step('WHEN: Fulfillment employee navigates to Ready Orders and opens order for handover', async () => {
         await fulfillmentSidebar.goToReady();
-              await readyOrdersPage.expectOnReadyPage();
-              await readyOrdersPage.expectTableLoaded();
-              if (placedOrderNumber) {
-                await readyOrdersPage.search(placedOrderNumber);
-                await readyOrdersPage.openOrderForHandover(placedOrderNumber);
-              }
+        await readyOrdersPage.expectOnReadyPage();
+        await readyOrdersPage.expectTableLoaded();
+        if (placedOrderNumber) {
+          await readyOrdersPage.openOrderForHandover(placedOrderNumber);
+        }
       });
 
       await test.step('AND: Fulfillment employee submits customer confirmation code in Handover modal', async () => {
