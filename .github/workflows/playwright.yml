@@ -120,13 +120,22 @@ jobs:
       - run: npm ci
 
       - name: Cache Playwright browser binaries
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      - name: Install Playwright dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: npx playwright install-deps chromium
+        env:
+          DEBIAN_FRONTEND: noninteractive
+
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       - name: Run tests
         run: npx playwright test --project=${{ matrix.project }}
@@ -174,13 +183,22 @@ jobs:
       - run: npm ci
 
       - name: Cache Playwright browser binaries
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      - name: Install Playwright dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: npx playwright install-deps chromium
+        env:
+          DEBIAN_FRONTEND: noninteractive
+
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       - name: Run E2E Bridge tests
         run: npx playwright test --project=e2e-bridge
