@@ -18,7 +18,7 @@ export abstract class BaseOrdersPage extends BasePage {
 
     this.tableTitle = page.locator('.tableTitle').first();
     this.searchInput = page.locator('input[placeholder="Search"]').first();
-    this.tableRows = page.locator('.q-table tbody tr.cursor-pointer, .q-table tbody tr, .ftx-table__body .ftx-table__tr, table tbody tr');
+    this.tableRows = page.locator('.q-table tbody tr.cursor-pointer:visible');
     this.loadingSpinner = page.locator('.q-table__loading, .q-spinner').first();
     this.noDataLabel = page.locator('.no-data, text="No record(s) found."').first();
     this.brandStoreFilter = page.locator('.select-ellipsis, label:has-text("Select Brand Store")').first();

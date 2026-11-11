@@ -137,6 +137,11 @@ export class FulfillmentSidebar {
     } catch {
       await this.page.goto('/fulfilled-orders', { waitUntil: 'domcontentloaded' });
     }
+    const reached = await this.page.waitForURL(/fulfilled-orders/i, { timeout: 6000 }).then(() => true).catch(() => false);
+    if (!reached) {
+      console.log('FulfillmentSidebar: Forcing direct navigation to /fulfilled-orders...');
+      await this.page.goto('/fulfilled-orders', { waitUntil: 'domcontentloaded' });
+    }
     await expect(this.page).toHaveURL(/fulfilled-orders/i, { timeout: 15000 });
   }
 

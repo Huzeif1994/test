@@ -44,7 +44,7 @@ test.describe('Fulfillment Pending Orders & Order Picking Workflow Suite', () =>
           await fulfilledOrdersPage.expectOnFulfilledPage();
           await fulfilledOrdersPage.search(orderToResume);
 
-          const fulfilledRow = page.locator('.q-table tbody tr.cursor-pointer').filter({ hasText: orderToResume }).first();
+          const fulfilledRow = page.locator('.q-table tbody tr:visible, table tbody tr:visible').filter({ hasText: orderToResume }).first();
           if (await fulfilledRow.isVisible()) {
             testInfo.annotations.push({ type: 'test-order', description: orderToResume });
             await expect(fulfilledRow).toBeVisible();

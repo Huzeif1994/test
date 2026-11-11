@@ -172,6 +172,7 @@ export class StorePickupDetailPage extends BasePage {
       await this.page.waitForTimeout(1000);
     }
     await this.page.locator('.q-dialog').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {});
+    await this.page.waitForURL(/\/(?:ready-orders|fulfilled-orders|dashboard|$)/i, { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(2000);
     console.log('Fulfillment Handover: Handover completed successfully (order fulfilled).');
   }

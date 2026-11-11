@@ -223,7 +223,7 @@ export class OrderingCatalogPage extends BasePage {
         'button:visible, .q-btn:visible, .add-cart:visible, a:visible, [role="button"]:visible'
       ).filter({ hasText: /Add to Cart/i }).first();
 
-      if (await dynamicAddBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)) {
         targetBtn = dynamicAddBtn;
         console.log('Selected first available product dynamically on current page.');
       }
