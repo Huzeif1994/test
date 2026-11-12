@@ -51,9 +51,10 @@ export class OrderingHomePage extends BasePage {
         handledSomething = true;
       }
 
-      // 2. Age Verification Modal (21+): click "Skip"
-      const skipBtn = this.page.getByRole('button', { name: /^Skip$/i }).or(this.page.locator('button').filter({ hasText: /^Skip$/i })).first();
-      const ageBtn = this.page.getByRole('button', { name: /21\+|I'm 21\+/i }).or(this.page.locator('button, a').filter({ hasText: /21\+|I'm 21\+/i })).first();
+      // 2. Age Verification Modal (#age-verification-modal / .avmodalDialog / 21+)
+      const avModal = this.page.locator('#age-verification-modal, .avmodalDialog, .ageVerification');
+      const skipBtn = this.page.getByRole('button', { name: /^Skip$/i }).or(this.page.locator('button, .q-btn').filter({ hasText: /^Skip$/i })).first();
+      const ageBtn = this.page.getByRole('button', { name: /21\+|I'm 21\+|I am 21\+/i }).or(this.page.locator('button, a, .q-btn').filter({ hasText: /21\+|I'm 21\+|I am 21\+/i })).first();
 
       if (await skipBtn.isVisible({ timeout: 500 }).catch(() => false)) {
         await skipBtn.click({ force: true }).catch(() => {});
@@ -63,6 +64,18 @@ export class OrderingHomePage extends BasePage {
         await ageBtn.click({ force: true }).catch(() => {});
         await ageBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         handledSomething = true;
+      } else if (await avModal.first().isVisible({ timeout: 500 }).catch(() => false)) {
+        const modalBtn = avModal.locator('button, .q-btn, a').filter({ hasText: /Skip|21\+|I am 21\+|I'm 21\+|Proceed/i }).first();
+        if (await modalBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await modalBtn.click({ force: true }).catch(() => {});
+          await modalBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+          handledSomething = true;
+        } else {
+          await this.page.evaluate(() => {
+            document.querySelectorAll('#age-verification-modal, .avmodalDialog').forEach(el => el.remove());
+          }).catch(() => {});
+          handledSomething = true;
+        }
       }
 
       // 3. Any consent or generic modal close "X" button
@@ -204,9 +217,10 @@ export class OrderingHomePage extends BasePage {
     // 2. Click Drawer Sign In and wait for Identity Server redirect
     await this.dismissAllPopups(2000);
     await Promise.all([
-      this.page.waitForURL(/dev-identity|Identity|Login/i, { timeout: 35000, waitUntil: 'domcontentloaded' }),
+      this.page.waitForURL(/dev-identity|Identity|Login/i, { timeout: 60000, waitUntil: 'commit' }),
       this.drawerSignInButton.click().catch(() => this.drawerSignInButton.dispatchEvent('click')),
     ]);
+    await this.page.waitForLoadState('domcontentloaded').catch(() => {});
     await this.page.waitForTimeout(2000);
 
     // 3. Switch to Email if page defaulted to Phone number

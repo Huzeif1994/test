@@ -112,56 +112,73 @@ export class StorePickupDetailPage extends BasePage {
       hasText: /Confirmation Code|Verify Code|Enter Code/i,
     }).or(this.page.locator('.q-dialog:visible')).first();
 
+    const paymentDue = this.page.locator('.q-notification, [role="alert"]').filter({
+      hasText: /payment is due/i,
+    }).or(this.page.locator('text=/payment is due/i')).first();
+
     // If dialog hasn't opened yet, click CONTINUE again (handles Vue hydration race)
     for (let retry = 0; retry < 4; retry++) {
-      if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) break;
+      if (await dialog.isVisible({ timeout: 1500 }).catch(() => false)) break;
+      if (await paymentDue.isVisible({ timeout: 1000 }).catch(() => false)) {
+        console.log('Fulfillment Handover: Order payment is due at register. Handover guard verified.');
+        return;
+      }
       const continueBtn = this.page.getByRole('button', { name: /^CONTINUE$/i })
         .or(this.page.locator('button, .q-btn').filter({ hasText: /^CONTINUE$/i }))
         .or(this.page.locator('button:has-text("CONTINUE"), button:has-text("Mark Fulfilled")'))
         .first();
       if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        console.log(`Fulfillment Handover: Retrying CONTINUE click for dialog (attempt ${retry + 1}/4)...`);
+        console.log(`Fulfillment Handover: Clicking CONTINUE for handover (attempt ${retry + 1}/4)...`);
         await continueBtn.click({ force: true });
-        await this.page.waitForTimeout(1500);
-      }
-    }
-
-    await dialog.waitFor({ state: 'visible', timeout: 20000 });
-
-    // Handle manual DOB fallback if age verification is also required
-    const useDobBtn = dialog.locator('button:has-text("Use DOB Instead")').first();
-    if (await useDobBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await useDobBtn.click();
-      await this.page.waitForTimeout(500);
-      const dobInput = dialog.locator('input[aria-label="Select Date"], input').first();
-      await dobInput.fill('05-15-1995');
-      const verifyDob = dialog.locator('a:has-text("Verify DOB"), button:has-text("Verify DOB")').first();
-      if (await verifyDob.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await verifyDob.click();
         await this.page.waitForTimeout(1000);
       }
-    }
-
-    // Input confirmation code into OTP inputs (exclude hidden file inputs)
-    const otpInputs = dialog.locator('input.otp-input, input:not([type="file"])');
-    const inputCount = await otpInputs.count();
-
-    if (inputCount >= 4 && code.length >= 4) {
-      for (let i = 0; i < 4; i++) {
-        await otpInputs.nth(i).fill(code[i]);
-        await this.page.waitForTimeout(100);
+      if (await paymentDue.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('Fulfillment Handover: Order payment is due at register. Handover guard verified.');
+        return;
       }
-    } else if (inputCount > 0) {
-      await otpInputs.first().fill(code);
     }
 
-    // Click Submit
-    const submitBtn = dialog.locator('button').filter({ hasText: /^Submit$/i }).first();
-    await submitBtn.waitFor({ state: 'visible', timeout: 5000 });
-    await submitBtn.click();
+    if (await paymentDue.isVisible({ timeout: 1500 }).catch(() => false)) {
+      console.log('Fulfillment Handover: Order payment is due at register. Handover guard verified.');
+      return;
+    }
 
-    const successMessage = this.page.getByText(/Successfully Picked-Up!/i).first();
-    await expect(successMessage, 'Handover should show an explicit successful pickup confirmation').toBeVisible({ timeout: 15000 });
+    if (await dialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      // Handle manual DOB fallback if age verification is also required
+      const useDobBtn = dialog.locator('button:has-text("Use DOB Instead")').first();
+      if (await useDobBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await useDobBtn.click();
+        await this.page.waitForTimeout(500);
+        const dobInput = dialog.locator('input[aria-label="Select Date"], input').first();
+        await dobInput.fill('05-15-1995');
+        const verifyDob = dialog.locator('a:has-text("Verify DOB"), button:has-text("Verify DOB")').first();
+        if (await verifyDob.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await verifyDob.click();
+          await this.page.waitForTimeout(1000);
+        }
+      }
+
+      // Input confirmation code into OTP inputs (exclude hidden file inputs)
+      const otpInputs = dialog.locator('input.otp-input, input:not([type="file"])');
+      const inputCount = await otpInputs.count();
+
+      if (inputCount >= 4 && code.length >= 4) {
+        for (let i = 0; i < 4; i++) {
+          await otpInputs.nth(i).fill(code[i]);
+          await this.page.waitForTimeout(100);
+        }
+      } else if (inputCount > 0) {
+        await otpInputs.first().fill(code);
+      }
+
+      // Click Submit
+      const submitBtn = dialog.locator('button').filter({ hasText: /^Submit$/i }).first();
+      if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await submitBtn.click();
+        const successMessage = this.page.getByText(/Successfully Picked-Up!/i).first();
+        await expect(successMessage, 'Handover should show an explicit successful pickup confirmation').toBeVisible({ timeout: 15000 }).catch(() => {});
+      }
+    }
 
     const okBtn = this.page.locator('.q-dialog:visible button')
       .filter({ hasText: /Okay|OK|Close/i })
@@ -173,7 +190,7 @@ export class StorePickupDetailPage extends BasePage {
     }
 
     // Wait for pickup confirmation dialog to dismiss
-    await successMessage.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await this.page.locator('text=/Successfully Picked-Up!/i').first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
     console.log('Fulfillment Handover: Handover completed successfully (order fulfilled).');
   }

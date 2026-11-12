@@ -70,22 +70,23 @@ export class PendingOrdersPage extends BaseOrdersPage {
 
     // Check if pagination label is visible
     if (await this.paginationRangeLabel.isVisible().catch(() => false)) {
-      const initialText = await this.paginationRangeLabel.textContent();
-
-      // If next button is enabled, click it
-      const isNextDisabled = await this.paginationNextButton.isDisabled().catch(() => true);
+      const nextBtn = this.page.locator('.q-table__bottom button').filter({ has: this.page.locator('i:has-text("chevron_right"), .q-icon[name="chevron_right"]') }).first();
+      const isNextDisabled = await nextBtn.isDisabled().catch(() => true);
       if (!isNextDisabled) {
-        await this.paginationNextButton.click();
+        await nextBtn.click();
         await this.expectTableLoaded();
         await this.page.waitForTimeout(1000);
 
-        // Click previous button to return
-        const isPrevDisabled = await this.paginationPrevButton.isDisabled().catch(() => true);
-        if (!isPrevDisabled) {
-          await this.paginationPrevButton.click();
-          await this.expectTableLoaded();
-          await this.page.waitForTimeout(1000);
+        // Click first page or previous button to return to page 1
+        const firstPageBtn = this.page.locator('.q-table__bottom button').filter({ has: this.page.locator('i:has-text("first_page"), .q-icon[name="first_page"]') }).first();
+        const prevBtn = this.page.locator('.q-table__bottom button').filter({ has: this.page.locator('i:has-text("chevron_left"), .q-icon[name="chevron_left"]') }).first();
+        if (await firstPageBtn.isVisible().catch(() => false) && !(await firstPageBtn.isDisabled().catch(() => true))) {
+          await firstPageBtn.click();
+        } else if (await prevBtn.isVisible().catch(() => false) && !(await prevBtn.isDisabled().catch(() => true))) {
+          await prevBtn.click();
         }
+        await this.expectTableLoaded();
+        await this.page.waitForTimeout(1000);
       }
     }
   }
@@ -118,7 +119,7 @@ export class PendingOrdersPage extends BaseOrdersPage {
       timeout: typeof target === 'string' ? 15000 : 10000,
     });
 
-    const dropdownBtn = row.locator('.action-dropdown, .dropdown-action, button[aria-haspopup="menu"]').first();
+    const dropdownBtn = row.locator('.action-dropdown, button[aria-label="Expand"], button[aria-haspopup="true"], .dropdown-action').first();
     if (await dropdownBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await dropdownBtn.click();
       await this.actionDropdownMenu.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
@@ -168,10 +169,27 @@ export class PendingOrdersPage extends BaseOrdersPage {
   }
 
   /**
+   * Retrieve the order number string from the topmost active row in the table
+   */
+  async getFirstPendingOrderNumber(): Promise<string> {
+    await this.expectTableLoaded();
+    const firstRow = this.tableRows.first();
+    await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+    const text = await firstRow.innerText();
+    const match = text.match(/(\d{6,}_\d+)/);
+    return match ? match[1].trim() : text.split('\n')[0].trim();
+  }
+
+  /**
    * Resilient condition-based polling helper for cross-system eventual consistency:
    * Repeatedly searches for target order, verifying presence in table with reload fallback.
    */
-  async waitForOrderInPending(orderNumber: string, maxAttempts: number = 15, retryIntervalMs: number = 3000): Promise<Locator> {
+  async waitForOrderInPending(
+    orderNumber: string,
+    maxAttempts: number = 10,
+    retryIntervalMs: number = 2500,
+    throwOnFailure: boolean = true
+  ): Promise<Locator | null> {
     console.log(`Fulfillment: Waiting for order "${orderNumber}" in Pending Orders (max attempts: ${maxAttempts})...`);
     const targetRow = this.tableRows.filter({ hasText: orderNumber }).first();
 
@@ -196,9 +214,10 @@ export class PendingOrdersPage extends BaseOrdersPage {
       }
     }
 
-    // Explicit diagnostic assertion if not found within deadline
-    await expect(targetRow, `Order ${orderNumber} failed to sync to Fulfillment within ${maxAttempts} attempts.`).toBeVisible({ timeout: 5000 });
-    return targetRow;
+    if (throwOnFailure) {
+      await expect(targetRow, `Order ${orderNumber} failed to sync to Fulfillment within ${maxAttempts} attempts.`).toBeVisible({ timeout: 5000 });
+    }
+    return null;
   }
 
   /**

@@ -10,6 +10,12 @@ try {
   if (!fs.existsSync('allure-results')) {
     fs.mkdirSync('allure-results', { recursive: true });
   }
+  if (!fs.existsSync('test-results')) {
+    fs.mkdirSync('test-results', { recursive: true });
+  }
+  if (!fs.existsSync('.auth')) {
+    fs.mkdirSync('.auth', { recursive: true });
+  }
   const envContent = [
     `RunId=${runId}`,
     `Environment=${process.env.TEST_ENV || 'dev'}`,
@@ -66,15 +72,19 @@ export default defineConfig({
         : ['--window-size=1366,768', '--no-sandbox', '--disable-setuid-sandbox'],
     },
 
-    trace: 'retain-on-failure',
+    trace: process.env.CI ? 'retain-on-failure' : 'off',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: process.env.CI ? 'retain-on-failure' : 'off',
   },
 
   projects: [
     {
       name: 'setup-preflight',
       testMatch: /preflight\.setup\.ts/,
+      use: {
+        trace: 'off',
+        video: 'off',
+      },
     },
     {
       name: 'setup-fulfillment',
@@ -83,6 +93,8 @@ export default defineConfig({
       use: {
         ...desktopChrome,
         baseURL: config.fulfillment.baseUrl,
+        trace: 'off',
+        video: 'off',
       },
     },
     {
@@ -92,6 +104,8 @@ export default defineConfig({
       use: {
         ...desktopChrome,
         baseURL: config.admin.baseUrl,
+        trace: 'off',
+        video: 'off',
       },
     },
     {
@@ -101,6 +115,8 @@ export default defineConfig({
       use: {
         ...desktopChrome,
         baseURL: config.ordering.baseUrl,
+        trace: 'off',
+        video: 'off',
       },
     },
     {

@@ -57,6 +57,14 @@ export abstract class BaseOrdersPage extends BasePage {
    */
   async search(query: string): Promise<void> {
     await this.searchInput.waitFor({ state: 'visible', timeout: 15000 });
+
+    // Reset to first page if table is paginated
+    const firstPageBtn = this.page.locator('.q-table__bottom button').filter({ has: this.page.locator('i:has-text("first_page"), .q-icon[name="first_page"]') }).first();
+    if (await firstPageBtn.isVisible().catch(() => false) && !(await firstPageBtn.isDisabled().catch(() => true))) {
+      await firstPageBtn.click().catch(() => {});
+      await this.expectTableLoaded();
+    }
+
     // Clear first to ensure Quasar v-model detects changes
     await this.searchInput.fill('');
     await this.page.waitForTimeout(200);

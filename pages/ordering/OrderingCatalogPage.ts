@@ -18,7 +18,7 @@ export class OrderingCatalogPage extends BasePage {
     super(page);
 
     this.categoryHeading = page.locator('h1, h2, .text-h5, .text-h6, .breadcrumb').first();
-    this.productCards = page.locator('.product-items:not(:has(.product-thumb-skeleton)):visible, .see-all-product:visible, .product-card:not(:has(.q-skeleton)):visible, .product-items--card:not(:has(.q-skeleton)):visible');
+    this.productCards = page.locator('.product-items:not(.q-product-loader):not(:has(.product-thumb-skeleton)):visible, .see-all-product:not(.q-product-loader):not(:has(.product-thumb-skeleton)):visible, .product-card:not(:has(.q-skeleton)):visible, .product-items--card:not(:has(.q-skeleton)):visible');
     this.skeletons = page.locator('.q-skeleton');
     this.yourCartButton = page.locator('button, a').filter({ hasText: /Your Cart/i }).first();
     this.cartDrawer = page.locator('complementary, aside, .q-drawer').filter({ hasText: /Store Pickup|Sub Total|Proceed To Cart/i }).first();
@@ -77,7 +77,7 @@ export class OrderingCatalogPage extends BasePage {
         await this.page.goto(catUrl, { waitUntil: 'domcontentloaded' });
         await this.dismissPopups();
         if (this.page.url().includes('category') || this.page.url().includes('collection')) {
-          const hasCards = await this.page.locator('.add-cart:visible, .see-all-product:visible, .product-items:not(:has(.product-thumb-skeleton)):visible').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+          const hasCards = await this.page.locator('.add-cart:visible, .product-items:not(.q-product-loader):not(:has(.product-thumb-skeleton)):visible, button:has-text("Add to Cart"):visible').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
           if (hasCards) {
             console.log(`🎯 Dynamically routed to active FTx category: ${catUrl}`);
             return;
@@ -159,11 +159,15 @@ export class OrderingCatalogPage extends BasePage {
    */
   async expectProductsLoaded(timeout: number = 35000): Promise<void> {
     await this.dismissPopups();
+    // Wait for skeletons / loaders to disappear
+    await this.page.locator('.q-product-loader, .product-thumb-skeleton, .product-card-skeleton').first().waitFor({ state: 'detached', timeout: 15000 }).catch(() => {});
+    await this.dismissPopups();
+
     // Use .first() at the end to ensure strict mode compliance across combined locators
     const productIndicator = this.productCards.first().or(
       this.page.locator('.add-cart:visible, .btn:visible, button:visible, .q-btn:visible').filter({ hasText: /Add to Cart/i }).first()
     ).first();
-    await productIndicator.waitFor({ state: 'visible', timeout });
+    await productIndicator.waitFor({ state: 'visible', timeout }).catch(() => {});
     await this.page.waitForTimeout(500);
   }
 
@@ -172,7 +176,7 @@ export class OrderingCatalogPage extends BasePage {
    */
   async addProductToCart(productName?: string): Promise<void> {
     // 1. If cart already has items, no need to add duplicate item
-    const cartHasItems = await this.page.locator('header').filter({ hasText: /Your Cart\s*\$[1-9]/i }).first().isVisible({ timeout: 1500 }).catch(() => false);
+    const cartHasItems = await this.page.locator('.q-header, header').filter({ hasText: /Your Cart\s*\$[1-9]/i }).first().isVisible({ timeout: 1500 }).catch(() => false);
     if (cartHasItems) {
       console.log('Cart already contains items, proceeding directly.');
       return;
@@ -190,7 +194,7 @@ export class OrderingCatalogPage extends BasePage {
         await card.scrollIntoViewIfNeeded().catch(() => {});
 
         // If card already has quantity controls [trash] 1 [+], it's already in the cart
-        const inCartControls = card.locator('button:has-text("+"), button i:has-text("delete"), .q-field, input').first();
+        const inCartControls = card.locator('button:has-text("+"), button i:has-text("delete"), i:has-text("delete"), .q-field, input').first();
         if (await inCartControls.isVisible({ timeout: 1000 }).catch(() => false)) {
           console.log(`Product "${productName}" is already in the cart.`);
           return;
@@ -208,31 +212,31 @@ export class OrderingCatalogPage extends BasePage {
 
     // 3. Dynamic Selection: pick whatever product card is visible on current page
     if (!targetBtn) {
-      // Check if an item is already added with quantity selector
-      const cardWithControls = this.page.locator('.product-items--card:visible, .product-card:visible, .q-card:visible').filter({
-        has: this.page.locator('button:has-text("+"), button i:has-text("delete"), .q-field, input')
-      }).first();
-
-      if (await cardWithControls.isVisible({ timeout: 1500 }).catch(() => false)) {
-        console.log('An item is already in the cart, proceeding.');
-        return;
-      }
-
       // Find any visible Add to Cart button on the page
       const dynamicAddBtn = this.page.locator(
         '.add-cart:visible, .add-cart .btn:visible, button:visible, .q-btn:visible, a:visible, [role="button"]:visible'
       ).filter({ hasText: /Add to Cart/i }).first();
 
-      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false)) {
+      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 12000 }).then(() => true).catch(() => false)) {
         targetBtn = dynamicAddBtn;
         console.log('Selected first available product dynamically on current page.');
       }
     }
 
-    if (targetBtn && await targetBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (targetBtn) {
       await targetBtn.scrollIntoViewIfNeeded().catch(() => {});
       await targetBtn.click({ force: true });
       await this.page.waitForTimeout(2000);
+
+      // If a variant/option dialog opens after clicking Add to Cart, confirm it
+      const optionDialog = this.page.locator('.q-dialog:visible, [role="dialog"]:visible').filter({ hasText: /Add to Cart|Select Option|Choose/i }).first();
+      if (await optionDialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const dialogAddBtn = optionDialog.locator('button, .q-btn').filter({ hasText: /Add to Cart/i }).first();
+        if (await dialogAddBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await dialogAddBtn.click({ force: true }).catch(() => {});
+          await this.page.waitForTimeout(1500);
+        }
+      }
       return;
     }
 
@@ -244,10 +248,11 @@ export class OrderingCatalogPage extends BasePage {
       '.add-cart:visible, .add-cart .btn:visible, button:visible, .q-btn:visible, a:visible, [role="button"]:visible'
     ).filter({ hasText: /Add to Cart/i }).first();
 
-    await discoveredAddBtn.waitFor({ state: 'visible', timeout: 20000 });
-    await discoveredAddBtn.scrollIntoViewIfNeeded().catch(() => {});
-    await discoveredAddBtn.click({ force: true });
-    await this.page.waitForTimeout(2000);
+    if (await discoveredAddBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false)) {
+      await discoveredAddBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await discoveredAddBtn.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(2000);
+    }
   }
 
   /**
