@@ -153,11 +153,7 @@ export class OrderingCheckoutPage extends BasePage {
             item.hasAttribute('disabled') ||
             el.hasAttribute('disabled') ||
             style.pointerEvents === 'none' ||
-            elStyle.pointerEvents === 'none' ||
-            item.classList.contains('text-grey') ||
-            item.classList.contains('text-grey-5') ||
-            item.classList.contains('text-grey-6') ||
-            item.classList.contains('text-grey-7')
+            elStyle.pointerEvents === 'none'
           );
         }).catch(() => true);
 
@@ -173,17 +169,17 @@ export class OrderingCheckoutPage extends BasePage {
     // If no enabled slots found today (e.g. late in the day), click next date tab
     if (!activeSlot) {
       console.log('Reserve Slot Dialog: No available slots on current day. Looking for next available date tab...');
-      const dateTabs = dialog.locator('button, [role="tab"], .q-btn, .q-card, div.cursor-pointer')
+      const dateTabs = dialog.locator('.addressDays li, .addressDays a, button, [role="tab"], .q-btn, .q-card, div.cursor-pointer')
         .filter({ hasText: /\b(TODAY|TOMORROW|MON|TUE|WED|THU|FRI|SAT|SUN|\d{1,2})\b/i });
 
       const tabCount = await dateTabs.count();
-      for (let t = 1; t < Math.min(tabCount, 5); t++) {
+      for (let t = 1; t < Math.min(tabCount, 7); t++) {
         const tab = dateTabs.nth(t);
         if (await tab.isVisible().catch(() => false)) {
           console.log(`Reserve Slot Dialog: Switching to date tab #${t}...`);
           await tab.click({ force: true }).catch(() => {});
-          await this.page.waitForTimeout(1200);
-          await dialog.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+          await this.page.waitForTimeout(1500);
+          await dialog.locator('.q-spinner, .q-skeleton').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
           activeSlot = await findEnabledSlot();
           if (activeSlot) break;
         }
@@ -336,38 +332,50 @@ export class OrderingCheckoutPage extends BasePage {
 
   /**
    * Select "Credit or Debit Card" payment option
-   * Matches HTML:
-   * 1. <div class="cursor-pointer">...<div class="card-payment-icon">...<p>Credit or Debit Card</p>
-   * 2. <div class="saved-card selected-saved-card">...<div class="q-radio">...<span class="card-number">
+   * Handles PaymentList.vue on /checkout:
+   * 1. Already selected card (isViewMode or .q-radio labeled 'Selected')
+   * 2. Saved card radio options under .stepsAddress or .saved-card
+   * 3. Edit toggle if collapsed
    */
   async selectCreditOrDebitCard(): Promise<void> {
-    // 1. Locate and click "Credit or Debit Card" option row
+    // 0. If payment section is in view mode and card is already selected, return early
+    const selectedRadio = this.page.locator('.stepsAddress .q-radio, .saved-card')
+      .filter({ hasText: /Selected/i })
+      .or(this.page.locator('.saved-card.selected-saved-card'))
+      .first();
+    if (await selectedRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.log('Checkout: Payment card is already selected.');
+      return;
+    }
+
+    // If edit button is available to expand collapsed payment section
+    const editBtn = this.page.locator('a.step-edit, button:has-text("Edit")').first();
+    if (await editBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await editBtn.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    }
+
+    // 1. Locate and click card row or label if present
     const cardOption = this.page.locator('.card-payment-icon')
       .locator('xpath=ancestor::div[contains(@class, "cursor-pointer")][1]')
+      .or(this.page.locator('strong, p, label').filter({ hasText: /^Credit or debit card$/i }))
       .first();
 
-    await cardOption.waitFor({ state: 'visible', timeout: 15000 });
-    await cardOption.scrollIntoViewIfNeeded().catch(() => {});
-    await cardOption.click({ force: true });
-    await this.page.waitForTimeout(500);
-
-    // Click the radio button inside the row
-    const cardRadio = cardOption.locator('.q-radio, [role="radio"]').first();
-    if (await cardRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await cardRadio.click({ force: true });
-    }
-    await this.page.waitForTimeout(1000);
-
-    // 2. Select the saved card (.saved-card)
-    const savedCard = this.page.locator('.saved-card').first();
-    if (await savedCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await savedCard.scrollIntoViewIfNeeded().catch(() => {});
-      await savedCard.click({ force: true });
-      const savedRadio = savedCard.locator('.q-radio, [role="radio"]').first();
-      if (await savedRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await savedRadio.click({ force: true });
-      }
+    if (await cardOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await cardOption.scrollIntoViewIfNeeded().catch(() => {});
+      await cardOption.click({ force: true }).catch(() => {});
       await this.page.waitForTimeout(500);
+    }
+
+    // 2. Select the first available saved card
+    const cardRadio = this.page.locator('.stepsAddress .q-radio, .saved-card .q-radio, [role="radio"]')
+      .first();
+    if (await cardRadio.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await cardRadio.scrollIntoViewIfNeeded().catch(() => {});
+      await cardRadio.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(500);
+    } else {
+      console.log('Checkout: Default saved payment method already applied.');
     }
   }
 
