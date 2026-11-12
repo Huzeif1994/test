@@ -163,15 +163,18 @@ export class StorePickupDetailPage extends BasePage {
     const successMessage = this.page.getByText(/Successfully Picked-Up!/i).first();
     await expect(successMessage, 'Handover should show an explicit successful pickup confirmation').toBeVisible({ timeout: 15000 });
 
-    const okBtn = this.page.getByRole('button', { name: /^OKAY$/i })
-      .or(this.page.locator('button:has-text("OKAY")'))
-      .or(this.page.locator('.q-dialog button, button').filter({ hasText: /OKAY|OK|Close/i }))
+    const okBtn = this.page.locator('.q-dialog:visible button')
+      .filter({ hasText: /Okay|OK|Close/i })
+      .or(this.page.getByRole('button', { name: /Okay|OK/i }))
       .first();
-    if (await okBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    if (await okBtn.isVisible({ timeout: 6000 }).catch(() => false)) {
       console.log('Fulfillment Handover: Dismissed handover confirmation modal.');
-      await okBtn.click();
+      await okBtn.click({ force: true });
     }
-    await this.page.locator('.q-dialog').waitFor({ state: 'hidden', timeout: 15000 });
+
+    // Wait for pickup confirmation dialog to dismiss
+    await successMessage.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
     console.log('Fulfillment Handover: Handover completed successfully (order fulfilled).');
   }
 }

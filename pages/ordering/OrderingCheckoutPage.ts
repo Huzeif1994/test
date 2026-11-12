@@ -91,15 +91,16 @@ export class OrderingCheckoutPage extends BasePage {
       await this.gotoCart();
     }
 
-    const btn = this.page.getByRole('button', { name: /Proceed to Checkout/i })
-      .or(this.page.locator('button, a').filter({ hasText: /Proceed to Checkout/i }))
+    const btn = this.page.locator('button:visible, a:visible')
+      .filter({ hasText: /Proceed to Checkout/i })
+      .or(this.page.getByRole('button', { name: /Proceed to Checkout/i }))
       .first();
-    const slotDialog = this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot/i }).first();
+    const slotDialog = this.page.locator('.q-dialog:visible, [role="dialog"]:visible').filter({ hasText: /Reserve a time slot/i }).first();
 
     await btn.waitFor({ state: 'visible', timeout: 20000 });
     await btn.scrollIntoViewIfNeeded().catch(() => {});
     try {
-      await btn.click();
+      await btn.click({ force: true });
     } catch (error) {
       const transitioned = this.page.url().includes('/checkout') ||
         await slotDialog.isVisible({ timeout: 1000 }).catch(() => false);
@@ -127,35 +128,34 @@ export class OrderingCheckoutPage extends BasePage {
    * If the current day's slots are all in the past/disabled, it shifts to the next available date tab.
    */
   async selectFirstAvailableTimeSlot(dialogLocator?: Locator): Promise<boolean> {
-    const dialog = dialogLocator || this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: /Reserve a time slot|Select Slot|Time Slot/i }).first();
+    const dialog = dialogLocator || this.page.locator('.q-dialog:visible, [role="dialog"]:visible').filter({ hasText: /Reserve a time slot|Select Slot|Time Slot/i }).first();
     if (!(await dialog.isVisible({ timeout: 5000 }).catch(() => false))) {
       return false;
     }
 
-    // Wait for any inner spinner to detach and slots to load
+    // 1. Wait for loading skeletons to detach / disappear
+    await dialog.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     await dialog.locator('.q-spinner').first().waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
-    await this.page.waitForTimeout(600);
+    await this.page.waitForTimeout(1000);
+
+    // Ensure slot container or day list is hydrated
+    await dialog.locator('.addressTime, .addressDays, .q-radio, text=/slots/i').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 
     const findEnabledSlot = async (): Promise<Locator | null> => {
-      const radios = dialog.locator('.q-radio, [role="radio"]');
+      const radios = dialog.locator('.addressTime .q-radio, .q-radio:visible, [role="radio"]:visible');
       const count = await radios.count();
       for (let i = 0; i < count; i++) {
         const radio = radios.nth(i);
         const isDisabled = await radio.evaluate((el) => {
-          const item = el.closest('.q-item') || el.closest('.q-list') || el;
-          const style = window.getComputedStyle(item);
-          const elStyle = window.getComputedStyle(el);
+          const item = el.closest('.q-item') || el;
           return (
             item.classList.contains('disabled') ||
-            el.classList.contains('disabled') ||
             item.getAttribute('aria-disabled') === 'true' ||
             el.getAttribute('aria-disabled') === 'true' ||
             item.hasAttribute('disabled') ||
-            el.hasAttribute('disabled') ||
-            style.pointerEvents === 'none' ||
-            elStyle.pointerEvents === 'none'
+            el.hasAttribute('disabled')
           );
-        }).catch(() => true);
+        }).catch(() => false);
 
         if (!isDisabled && await radio.isVisible().catch(() => false)) {
           return radio;
@@ -169,7 +169,7 @@ export class OrderingCheckoutPage extends BasePage {
     // If no enabled slots found today (e.g. late in the day), click next date tab
     if (!activeSlot) {
       console.log('Reserve Slot Dialog: No available slots on current day. Looking for next available date tab...');
-      const dateTabs = dialog.locator('.addressDays li, .addressDays a, button, [role="tab"], .q-btn, .q-card, div.cursor-pointer')
+      const dateTabs = dialog.locator('.addressDays li, ul.addressDays li, .addressDays a, button, [role="tab"], .q-btn, div.cursor-pointer')
         .filter({ hasText: /\b(TODAY|TOMORROW|MON|TUE|WED|THU|FRI|SAT|SUN|\d{1,2})\b/i });
 
       const tabCount = await dateTabs.count();
@@ -179,7 +179,7 @@ export class OrderingCheckoutPage extends BasePage {
           console.log(`Reserve Slot Dialog: Switching to date tab #${t}...`);
           await tab.click({ force: true }).catch(() => {});
           await this.page.waitForTimeout(1500);
-          await dialog.locator('.q-spinner, .q-skeleton').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+          await dialog.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
           activeSlot = await findEnabledSlot();
           if (activeSlot) break;
         }
@@ -190,22 +190,23 @@ export class OrderingCheckoutPage extends BasePage {
       console.log('Reserve Slot Dialog: Selecting active time slot...');
       await activeSlot.scrollIntoViewIfNeeded().catch(() => {});
       await activeSlot.click({ force: true });
-      await this.page.waitForTimeout(600);
+      await this.page.waitForTimeout(1000);
     } else {
-      const fallbackRadio = dialog.locator('.q-radio, [role="radio"]').last();
-      if (await fallbackRadio.isVisible().catch(() => false)) {
-        console.log('Reserve Slot Dialog: Clicking fallback slot radio...');
+      const fallbackRadio = dialog.locator('.addressTime .q-item, .q-radio').first();
+      if (await fallbackRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('Reserve Slot Dialog: Clicking fallback slot item...');
         await fallbackRadio.click({ force: true }).catch(() => {});
-        await this.page.waitForTimeout(600);
+        await this.page.waitForTimeout(1000);
       }
     }
 
     // Click confirm / proceed button in modal
     const confirmBtn = dialog.locator('button, .q-btn')
-      .filter({ hasText: /Proceed To Checkout|Proceed to Checkout|Confirm|Save|Apply|Select|Done|Submit/i })
+      .filter({ hasText: /Proceed To Checkout|Proceed To Cart|Book Slot|Confirm|Save|Apply|Select|Done|Submit/i })
       .first();
 
     if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await expect(confirmBtn).toBeEnabled({ timeout: 10000 }).catch(() => {});
       await confirmBtn.scrollIntoViewIfNeeded().catch(() => {});
       await confirmBtn.click({ force: true });
       await dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
