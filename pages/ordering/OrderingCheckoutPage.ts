@@ -109,17 +109,31 @@ export class OrderingCheckoutPage extends BasePage {
       }
     }
 
-    if (await slotDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+    const hasDialog = await slotDialog.waitFor({ state: 'visible', timeout: 6000 }).then(() => true).catch(() => false);
+    if (hasDialog) {
       console.log('Cart: "Reserve a time slot" dialog detected, selecting available slot...');
       await this.selectFirstAvailableTimeSlot(slotDialog);
     }
 
-    if (!this.page.url().includes('/checkout') &&
-        await slotDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await this.selectFirstAvailableTimeSlot(slotDialog);
+    if (!this.page.url().includes('/checkout')) {
+      const stillHasDialog = await slotDialog.isVisible().catch(() => false);
+      if (stillHasDialog) {
+        await this.selectFirstAvailableTimeSlot(slotDialog);
+      }
     }
 
-    await this.page.waitForURL(/\/checkout/i, { timeout: 60000 });
+    // If still on /cart after dialog closes, re-click Proceed to Checkout on the page
+    if (!this.page.url().includes('/checkout')) {
+      const pageProceedBtn = this.page.locator('button:visible, a:visible')
+        .filter({ hasText: /Proceed to Checkout/i })
+        .first();
+      if (await pageProceedBtn.isVisible().catch(() => false)) {
+        console.log('Cart: Re-clicking page Proceed to Checkout after time slot selection...');
+        await pageProceedBtn.click({ force: true });
+      }
+    }
+
+    await this.page.waitForURL(/\/checkout/i, { timeout: 45000 });
     await this.expectCheckoutLoaded();
   }
 
@@ -141,8 +155,17 @@ export class OrderingCheckoutPage extends BasePage {
     // Ensure slot container or day list is hydrated
     await dialog.locator('.addressTime, .addressDays, .q-radio, text=/slots/i').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 
+    // If modal requires address selection (Delivery mode), select first address
+    const chooseAddrBtn = dialog.locator('button, .q-btn').filter({ hasText: /Choose address/i }).first();
+    if (await chooseAddrBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.log('Reserve Slot Dialog: Selecting address...');
+      await chooseAddrBtn.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(1000);
+      await dialog.locator('.q-skeleton').first().waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+    }
+
     const findEnabledSlot = async (): Promise<Locator | null> => {
-      const radios = dialog.locator('.addressTime .q-radio, .q-radio:visible, [role="radio"]:visible');
+      const radios = dialog.locator('label.q-item:has(.q-radio), .addressTime .q-radio, .q-radio:visible, [role="radio"]:visible');
       const count = await radios.count();
       for (let i = 0; i < count; i++) {
         const radio = radios.nth(i);

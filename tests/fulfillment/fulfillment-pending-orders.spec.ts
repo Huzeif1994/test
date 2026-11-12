@@ -190,7 +190,7 @@ test.describe('Fulfillment Pending Orders & Order Picking Workflow Suite', () =>
         await fulfilledOrdersPage.expectOrderRowVisible(orderNumber);
       });
     } finally {
-      await customerContext.close();
+      await customerContext.close().catch(() => {});
     }
   });
 });
