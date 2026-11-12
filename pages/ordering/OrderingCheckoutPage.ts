@@ -115,24 +115,6 @@ export class OrderingCheckoutPage extends BasePage {
       await this.selectFirstAvailableTimeSlot(slotDialog);
     }
 
-    if (!this.page.url().includes('/checkout')) {
-      const stillHasDialog = await slotDialog.isVisible().catch(() => false);
-      if (stillHasDialog) {
-        await this.selectFirstAvailableTimeSlot(slotDialog);
-      }
-    }
-
-    // If still on /cart after dialog closes, re-click Proceed to Checkout on the page
-    if (!this.page.url().includes('/checkout')) {
-      const pageProceedBtn = this.page.locator('button:visible, a:visible')
-        .filter({ hasText: /Proceed to Checkout/i })
-        .first();
-      if (await pageProceedBtn.isVisible().catch(() => false)) {
-        console.log('Cart: Re-clicking page Proceed to Checkout after time slot selection...');
-        await pageProceedBtn.click({ force: true });
-      }
-    }
-
     await this.page.waitForURL(/\/checkout/i, { timeout: 45000 });
     await this.expectCheckoutLoaded();
   }
@@ -212,13 +194,13 @@ export class OrderingCheckoutPage extends BasePage {
     if (activeSlot) {
       console.log('Reserve Slot Dialog: Selecting active time slot...');
       await activeSlot.scrollIntoViewIfNeeded().catch(() => {});
-      await activeSlot.click({ force: true });
+      await activeSlot.click();
       await this.page.waitForTimeout(1000);
     } else {
       const fallbackRadio = dialog.locator('.addressTime .q-item, .q-radio').first();
       if (await fallbackRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
         console.log('Reserve Slot Dialog: Clicking fallback slot item...');
-        await fallbackRadio.click({ force: true }).catch(() => {});
+        await fallbackRadio.click();
         await this.page.waitForTimeout(1000);
       }
     }
@@ -231,7 +213,7 @@ export class OrderingCheckoutPage extends BasePage {
     if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expect(confirmBtn).toBeEnabled({ timeout: 10000 }).catch(() => {});
       await confirmBtn.scrollIntoViewIfNeeded().catch(() => {});
-      await confirmBtn.click({ force: true });
+      await confirmBtn.click();
       await dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     }
 
