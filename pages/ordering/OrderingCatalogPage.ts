@@ -63,13 +63,12 @@ export class OrderingCatalogPage extends BasePage {
   async discoverAndNavigateToActiveCategory(): Promise<void> {
     await this.dismissPopups();
 
-    // 1. Try known active FTx Storefront categories
+    // 1. Try known active FTx Storefront collections & categories (guaranteed products)
     const primeCategories = [
+      '/collection/best-selling-products-last-7-days',
       '/category/cigarettes',
       '/category/accessories-60',
-      '/category/aj-product-category',
-      '/category/apparel-01',
-      '/collection/best-selling-products-last-7-days'
+      '/category/apparel-01'
     ];
 
     for (const catUrl of primeCategories) {
@@ -79,7 +78,7 @@ export class OrderingCatalogPage extends BasePage {
         if (this.page.url().includes('category') || this.page.url().includes('collection')) {
           const hasCards = await this.productCards.first().isVisible({ timeout: 6000 }).catch(() => false);
           if (hasCards) {
-            console.log(`🎯 Dynamically routed to active FTx category: ${catUrl}`);
+            console.log(`🎯 Dynamically routed to active FTx catalog: ${catUrl}`);
             return;
           }
         }
@@ -223,9 +222,21 @@ export class OrderingCatalogPage extends BasePage {
         'button:visible, .q-btn:visible, .add-cart:visible, a:visible, [role="button"]:visible'
       ).filter({ hasText: /Add to Cart/i }).first();
 
-      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)) {
+      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false)) {
         targetBtn = dynamicAddBtn;
         console.log('Selected first available product dynamically on current page.');
+      } else {
+        // If no direct Add to Cart on grid, click the first product card to go to Product Detail Page (PDP)
+        const firstCard = this.productCards.first();
+        if (await firstCard.isVisible({ timeout: 4000 }).catch(() => false)) {
+          console.log('Navigating to Product Detail Page from card...');
+          await firstCard.click();
+          await this.page.waitForTimeout(1500);
+          const pdpAddBtn = this.page.locator('button:visible, .q-btn:visible').filter({ hasText: /Add to Cart/i }).first();
+          if (await pdpAddBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)) {
+            targetBtn = pdpAddBtn;
+          }
+        }
       }
     }
 
