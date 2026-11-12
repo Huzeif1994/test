@@ -18,7 +18,7 @@ export class OrderingCatalogPage extends BasePage {
     super(page);
 
     this.categoryHeading = page.locator('h1, h2, .text-h5, .text-h6, .breadcrumb').first();
-    this.productCards = page.locator('.product-items--card:visible, .product-card:visible, [class*="product-items"]:visible, .q-card.product-items--card:visible');
+    this.productCards = page.locator('.product-items:not(:has(.product-thumb-skeleton)):visible, .see-all-product:visible, .product-card:not(:has(.q-skeleton)):visible, .product-items--card:not(:has(.q-skeleton)):visible');
     this.skeletons = page.locator('.q-skeleton');
     this.yourCartButton = page.locator('button, a').filter({ hasText: /Your Cart/i }).first();
     this.cartDrawer = page.locator('complementary, aside, .q-drawer').filter({ hasText: /Store Pickup|Sub Total|Proceed To Cart/i }).first();
@@ -65,8 +65,8 @@ export class OrderingCatalogPage extends BasePage {
 
     // 1. Try known active FTx Storefront categories
     const primeCategories = [
-      '/category/accessories-60',
       '/category/apparel-01',
+      '/category/accessories-60',
       '/category/cigarettes',
       '/category/aj-product-category',
       '/collection/best-selling-products-last-7-days'
@@ -77,7 +77,7 @@ export class OrderingCatalogPage extends BasePage {
         await this.page.goto(catUrl, { waitUntil: 'domcontentloaded' });
         await this.dismissPopups();
         if (this.page.url().includes('category') || this.page.url().includes('collection')) {
-          const hasCards = await this.productCards.first().isVisible({ timeout: 3500 }).catch(() => false);
+          const hasCards = await this.page.locator('.add-cart:visible, .see-all-product:visible, .product-items:not(:has(.product-thumb-skeleton)):visible').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
           if (hasCards) {
             console.log(`🎯 Dynamically routed to active FTx category: ${catUrl}`);
             return;
@@ -220,10 +220,10 @@ export class OrderingCatalogPage extends BasePage {
 
       // Find any visible Add to Cart button on the page
       const dynamicAddBtn = this.page.locator(
-        'button:visible, .q-btn:visible, .add-cart:visible, a:visible, [role="button"]:visible'
+        '.add-cart:visible, .add-cart .btn:visible, button:visible, .q-btn:visible, a:visible, [role="button"]:visible'
       ).filter({ hasText: /Add to Cart/i }).first();
 
-      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)) {
+      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false)) {
         targetBtn = dynamicAddBtn;
         console.log('Selected first available product dynamically on current page.');
       }
@@ -241,10 +241,10 @@ export class OrderingCatalogPage extends BasePage {
     await this.discoverAndNavigateToActiveCategory();
 
     const discoveredAddBtn = this.page.locator(
-      'button:visible, .q-btn:visible, .add-cart:visible, a:visible, [role="button"]:visible'
+      '.add-cart:visible, .add-cart .btn:visible, button:visible, .q-btn:visible, a:visible, [role="button"]:visible'
     ).filter({ hasText: /Add to Cart/i }).first();
 
-    await discoveredAddBtn.waitFor({ state: 'visible', timeout: 15000 });
+    await discoveredAddBtn.waitFor({ state: 'visible', timeout: 20000 });
     await discoveredAddBtn.scrollIntoViewIfNeeded().catch(() => {});
     await discoveredAddBtn.click({ force: true });
     await this.page.waitForTimeout(2000);
