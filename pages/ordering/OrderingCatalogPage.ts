@@ -63,12 +63,13 @@ export class OrderingCatalogPage extends BasePage {
   async discoverAndNavigateToActiveCategory(): Promise<void> {
     await this.dismissPopups();
 
-    // 1. Try known active FTx Storefront collections & categories (guaranteed products)
+    // 1. Try known active FTx Storefront categories
     const primeCategories = [
-      '/collection/best-selling-products-last-7-days',
-      '/category/cigarettes',
       '/category/accessories-60',
-      '/category/apparel-01'
+      '/category/apparel-01',
+      '/category/cigarettes',
+      '/category/aj-product-category',
+      '/collection/best-selling-products-last-7-days'
     ];
 
     for (const catUrl of primeCategories) {
@@ -76,9 +77,9 @@ export class OrderingCatalogPage extends BasePage {
         await this.page.goto(catUrl, { waitUntil: 'domcontentloaded' });
         await this.dismissPopups();
         if (this.page.url().includes('category') || this.page.url().includes('collection')) {
-          const hasCards = await this.productCards.first().isVisible({ timeout: 6000 }).catch(() => false);
+          const hasCards = await this.productCards.first().isVisible({ timeout: 3500 }).catch(() => false);
           if (hasCards) {
-            console.log(`🎯 Dynamically routed to active FTx catalog: ${catUrl}`);
+            console.log(`🎯 Dynamically routed to active FTx category: ${catUrl}`);
             return;
           }
         }
@@ -222,42 +223,16 @@ export class OrderingCatalogPage extends BasePage {
         'button:visible, .q-btn:visible, .add-cart:visible, a:visible, [role="button"]:visible'
       ).filter({ hasText: /Add to Cart/i }).first();
 
-      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false)) {
+      if (await dynamicAddBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)) {
         targetBtn = dynamicAddBtn;
         console.log('Selected first available product dynamically on current page.');
-      } else {
-        // If no direct Add to Cart on grid, click the first product card to go to Product Detail Page (PDP)
-        const firstCard = this.productCards.first();
-        if (await firstCard.isVisible({ timeout: 4000 }).catch(() => false)) {
-          console.log('Navigating to Product Detail Page from card...');
-          await firstCard.click();
-          await this.page.waitForTimeout(1500);
-          const pdpAddBtn = this.page.locator('button:visible, .q-btn:visible').filter({ hasText: /Add to Cart/i }).first();
-          if (await pdpAddBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false)) {
-            targetBtn = pdpAddBtn;
-          }
-        }
       }
     }
 
     if (targetBtn && await targetBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await targetBtn.scrollIntoViewIfNeeded().catch(() => {});
       await targetBtn.click({ force: true });
-      await this.page.waitForTimeout(1500);
-
-      // Handle Quick Shop modal if product has variants / options
-      const quickDialog = this.page.locator('.quickDialogProduct, [role="dialog"]').filter({ hasText: /Quick Shop|Product Details/i }).first();
-      if (await quickDialog.isVisible({ timeout: 2000 }).catch(() => false)) {
-        const dialogAddBtn = quickDialog.locator('button, .q-btn').filter({ hasText: /Add to Cart/i }).first();
-        if (await dialogAddBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await dialogAddBtn.click({ force: true });
-          await this.page.waitForTimeout(1500);
-        }
-        const closeBtn = quickDialog.locator('button.close, button[aria-label="Close"], i:has-text("close")').first();
-        if (await closeBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
-          await closeBtn.click({ force: true }).catch(() => {});
-        }
-      }
+      await this.page.waitForTimeout(2000);
       return;
     }
 
@@ -272,20 +247,7 @@ export class OrderingCatalogPage extends BasePage {
     await discoveredAddBtn.waitFor({ state: 'visible', timeout: 15000 });
     await discoveredAddBtn.scrollIntoViewIfNeeded().catch(() => {});
     await discoveredAddBtn.click({ force: true });
-    await this.page.waitForTimeout(1500);
-
-    const fallbackQuickDialog = this.page.locator('.quickDialogProduct, [role="dialog"]').filter({ hasText: /Quick Shop|Product Details/i }).first();
-    if (await fallbackQuickDialog.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const dialogAddBtn = fallbackQuickDialog.locator('button, .q-btn').filter({ hasText: /Add to Cart/i }).first();
-      if (await dialogAddBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await dialogAddBtn.click({ force: true });
-        await this.page.waitForTimeout(1500);
-      }
-      const closeBtn = fallbackQuickDialog.locator('button.close, button[aria-label="Close"], i:has-text("close")').first();
-      if (await closeBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
-        await closeBtn.click({ force: true }).catch(() => {});
-      }
-    }
+    await this.page.waitForTimeout(2000);
   }
 
   /**
